@@ -1,0 +1,22 @@
+[
+  {
+    "id": "total",
+    "category": "Łącznie",
+    "ytd": "-"
+  },
+  {
+    "id": "pizza",
+    "category": "Pizze",
+    "ytd": "-"
+  },
+  {
+    "id": "other-sales-qty",
+    "category": "Pozostałe",
+    "ytd": "-"
+  },
+  {
+    "id": "drinks",
+    "category": "Napoje",
+    "ytd": "-"
+  }
+]
