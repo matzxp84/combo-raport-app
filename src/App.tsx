@@ -16,6 +16,21 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "@/components/theme-provider";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarSeparator,
+  SidebarInset,
+} from "@/components/ui/sidebar";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -1463,10 +1478,52 @@ export function App() {
     : t5Data;
 
   return (
+    <SidebarProvider defaultOpen={false}>
+      <Sidebar collapsible="offcanvas">
+        <SidebarHeader className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <img src="/vite.svg" alt="Logo" className="size-6" />
+            <span className="font-semibold text-sm">Combo Raport</span>
+          </div>
+        </SidebarHeader>
+        <SidebarSeparator />
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Sekcje raportu</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <a href="#t1">
+                      <span>T1 — Wolumen miesięczny</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <a href="#t2">
+                      <span>T2 — KPI miesięczne</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <a href="#t5">
+                      <span>T5 — Sprzedaż YTD</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+      <SidebarInset>
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
+            <SidebarTrigger />
             <img src="/vite.svg" alt="Logo" className="size-8" />
             <span className="font-semibold text-lg">Combo Raport</span>
           </div>
@@ -1475,7 +1532,7 @@ export function App() {
       </header>
       <main className="flex-1">
         <div className="w-full px-[5%] py-10 flex flex-col gap-8">
-        <section data-table-id={TABLE_IDS.T1}>
+        <section id="t1" data-table-id={TABLE_IDS.T1}>
           <h1 className="text-xl font-semibold mb-1">
             Informacje o wolumenie miesięcznym (T1)
           </h1>
@@ -1503,7 +1560,7 @@ export function App() {
             hidePercent={!t1Visibility.showPercent}
           />
         </section>
-        <section data-table-id={TABLE_IDS.T2}>
+        <section id="t2" data-table-id={TABLE_IDS.T2}>
           <h2 className="text-xl font-semibold mb-1">
             Kluczowe wskaźniki miesięczne (T2)
           </h2>
@@ -1544,7 +1601,7 @@ export function App() {
           />
         </section>
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          <div data-table-id={TABLE_IDS.T5}>
+          <div id="t5" data-table-id={TABLE_IDS.T5}>
             <h2 className="text-xl font-semibold mb-1">
               Sprzedaż od początku tego roku (T5)
             </h2>
@@ -1580,6 +1637,8 @@ export function App() {
         </div>
       </footer>
     </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
