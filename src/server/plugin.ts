@@ -23,6 +23,7 @@ import {
   handleAuthRoute,
   requireAuth,
 } from "./auth.ts";
+import { handleEmailRoute } from "./email.ts";
 
 const TM_YEAR = 2026;
 const TM_MONTH_0 = 3; // April
@@ -117,6 +118,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
   if (pathname.startsWith("/api/auth/")) {
     return handleAuthRoute(pathname.slice("/api/auth".length), req, res);
+  }
+
+  if (pathname.startsWith("/api/admin/email/")) {
+    return handleEmailRoute(pathname.slice("/api/admin/email".length), req, res);
   }
 
   if (pathname.startsWith("/api/admin/")) {

@@ -205,6 +205,10 @@ function publicUser(u: User) {
   return { id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt };
 }
 
+export function getAllUsersForRecipients(): User[] {
+  return loadStore().users.slice();
+}
+
 export function appendLog(entry: Omit<LogEntry, "id" | "ts">) {
   const s = loadStore();
   s.logs.unshift({ id: randomId(), ts: new Date().toISOString(), ...entry });

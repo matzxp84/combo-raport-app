@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/contexts/useAuth";
 import type { AuthUser } from "@/contexts/AuthContext";
+import { EmailReportSection } from "@/components/EmailReportSection";
 
 type AdminUser = AuthUser;
 
@@ -31,7 +32,7 @@ type EditState = {
   password: string;
 };
 
-type Section = "users" | "logs-login" | "logs-api" | "logs-report";
+type Section = "users" | "email" | "logs-login" | "logs-api" | "logs-report";
 
 export function AdminPanel() {
   const { user: me, authFetch } = useAuth();
@@ -157,6 +158,13 @@ export function AdminPanel() {
             Użytkownicy
           </Button>
           <Button
+            variant={section === "email" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSection("email")}
+          >
+            Email raport
+          </Button>
+          <Button
             variant={section === "logs-login" ? "default" : "outline"}
             size="sm"
             onClick={() => setSection("logs-login")}
@@ -182,6 +190,8 @@ export function AdminPanel() {
 
       {err && <p className="text-sm text-destructive">{err}</p>}
       {loading && <p className="text-sm text-muted-foreground">Ładowanie…</p>}
+
+      {section === "email" && <EmailReportSection />}
 
       {section === "users" && (
         <>
@@ -279,7 +289,7 @@ export function AdminPanel() {
         </>
       )}
 
-      {section !== "users" && (
+      {(section === "logs-login" || section === "logs-api" || section === "logs-report") && (
         <section className="rounded-lg border border-border bg-card">
           <Table>
             <TableHeader>

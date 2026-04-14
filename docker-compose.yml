@@ -38,6 +38,7 @@ services:
       - NODE_ENV=production
       - PORT=4173
       - AUTH_DATA_PATH=/app/data/auth.json
+      - EMAIL_DATA_PATH=/app/data/email.json
     networks:
       - combo_net
     restart: unless-stopped
@@ -50,9 +51,39 @@ services:
     profiles:
       - prod
 
+  # ── Second prod instance exposed on port 87 (combo87.toadres.pl) ─────────
+  prod87:
+    build:
+      context: .
+      target: prod
+    image: combo-raport-prod:latest
+    container_name: combo_prod87
+    ports:
+      - "87:4173"
+    volumes:
+      - combo_data_87:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=4173
+      - AUTH_DATA_PATH=/app/data/auth.json
+      - EMAIL_DATA_PATH=/app/data/email.json
+    networks:
+      - combo_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4173/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    profiles:
+      - prod87
+
 volumes:
   combo_data:
     name: combo_data
+  combo_data_87:
+    name: combo_data_87
 
 networks:
   # Izolowana sieć – nie koliduje z sieciami spzw_backend / spzw_frontend
