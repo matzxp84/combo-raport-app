@@ -12,10 +12,10 @@ import {
 } from "./gopos-api.ts";
 import {
   aggregateCategories,
-  buildT2Rows,
   formatInteger,
   formatMoney,
-  type MonthInputs,
+  formatPercent,
+  formatQuantity,
 } from "./gopos-mapper.ts";
 
 const TM_YEAR = 2026;
@@ -57,10 +57,25 @@ async function handleT2Current(orgId: string, res: ServerResponse) {
     ]);
     const orders = extractOrdersSales(ordersData);
     const cats = aggregateCategories(extractCategoriesFromItems(itemsData));
-    const inputs: MonthInputs[] = [{ orders, categories: cats }];
-    const rows = buildT2Rows(inputs);
-    const cells: Record<string, string> = {};
-    for (const r of rows) cells[r.id] = r.cells[0];
+    const netTotal = orders?.net_total_money ?? 0;
+    const avgNet = orders?.average_net_money ?? 0;
+    const txCount = orders?.transaction_count ?? 0;
+    const pizzaNet = cats.pizzaNet || netTotal;
+    const totalProd = cats.totalNet || netTotal;
+    const drinksPct = totalProd > 0 ? (cats.drinksNet / totalProd) * 100 : null;
+    const cells: Record<string, string> = {
+      "avg-sales": formatMoney(avgNet),
+      "customers-count": formatQuantity(txCount),
+      "other-sales-qty": formatQuantity(cats.othersQty),
+      "customers-yoy": "-",
+      "sales-pizza-total": formatMoney(pizzaNet),
+      "pizzas-yoy": "-",
+      "drinks-sales": formatMoney(cats.drinksNet),
+      "drinks-pct": formatPercent(drinksPct),
+      "addons-sales": formatMoney(cats.addonsNet),
+      "starters-sales": formatMoney(cats.startersNet),
+      "avg-bill": formatMoney(avgNet),
+    };
     json(res, 200, { cells });
   } catch (err) {
     json(res, 500, { error: (err as Error).message });
