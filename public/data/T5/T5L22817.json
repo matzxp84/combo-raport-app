@@ -2,21 +2,21 @@
   {
     "id": "total",
     "category": "Łącznie",
-    "ytd": "150 884,81 zł"
+    "ytd": "-"
   },
   {
     "id": "pizza",
     "category": "Pizze",
-    "ytd": "105 784,78 zł"
+    "ytd": "-"
   },
   {
     "id": "other-sales-qty",
     "category": "Pozostałe",
-    "ytd": "13 212,00"
+    "ytd": "-"
   },
   {
     "id": "drinks",
     "category": "Napoje",
-    "ytd": "1 665,17 zł"
+    "ytd": "-"
   }
 ]

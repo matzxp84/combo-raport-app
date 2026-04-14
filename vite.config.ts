@@ -7,9 +7,14 @@ import checker from "vite-plugin-checker"
 import { visualizer } from "rollup-plugin-visualizer"
 import liveReload from "vite-plugin-live-reload"
 import { watchAndRun } from "vite-plugin-watch-and-run"
+import { loadEnv } from "vite"
+import { goposApiPlugin } from "./src/server/plugin.ts"
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  Object.assign(process.env, loadEnv(mode, process.cwd(), ""))
+  return {
   plugins: [
+    goposApiPlugin(),
     react(),
     tailwindcss(),
     tsconfigPaths(),
@@ -54,4 +59,5 @@ export default defineConfig({
       plugins: [],
     },
   },
+  }
 })

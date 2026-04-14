@@ -31,6 +31,9 @@ import {
   SidebarSeparator,
   SidebarInset,
 } from "@/components/ui/sidebar";
+import { UserCircle, Home, ArrowUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FetchButton } from "@/components/fetch-button";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -134,11 +137,11 @@ function getBaseYearTwoDigits(label: string, fallbackId: string): string {
   return fallbackId.slice(-2);
 }
 
-/** T1 month cell ID: TY+02 -> TYLM, TY+03 -> TYTM, TY+04 -> TYNM, otherwise base+monthId. */
+/** T1 month cell ID: TY+03 -> TYLM, TY+04 -> TYTM, TY+05 -> TYNM, otherwise base+monthId. */
 function getT1MonthCellId(baseYearTwoDigits: string, monthId: string): string {
-  if (baseYearTwoDigits === "TY" && monthId === "02") return "TYLM";
-  if (baseYearTwoDigits === "TY" && monthId === "03") return "TYTM";
-  if (baseYearTwoDigits === "TY" && monthId === "04") return "TYNM";
+  if (baseYearTwoDigits === "TY" && monthId === "03") return "TYLM";
+  if (baseYearTwoDigits === "TY" && monthId === "04") return "TYTM";
+  if (baseYearTwoDigits === "TY" && monthId === "05") return "TYNM";
   return `${baseYearTwoDigits}${monthId}`;
 }
 
@@ -146,6 +149,7 @@ type CellValue = {
   value: string;
   highlight?: boolean;
   highlightBg?: boolean;
+  fromApi?: boolean;
 };
 
 type ReportRow = {
@@ -159,20 +163,20 @@ const reportData: ReportRow[] = [
     id: "2026",
     label: "2026",
     cells: [
-      { value: "88 045" },
-      { value: "79 546" },
-      { value: "X", highlight: true },
-      { value: "0" },
-      { value: "0" },
-      { value: "0" },
-      { value: "0" },
-      { value: "0" },
-      { value: "0" },
-      { value: "0" },
-      { value: "0" },
-      { value: "0" },
-      { value: "196 424" },
-      { value: "65 475" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
+      { value: "-" },
     ],
   },
   {
@@ -292,7 +296,8 @@ function CellContent({
     <span
       className={`
         text-right tabular-nums
-        ${cell.highlight ? "text-amber-500 dark:text-amber-400" : ""}
+        ${cell.fromApi ? "text-emerald-500 dark:text-emerald-400 font-semibold" : ""}
+        ${cell.highlight && !cell.fromApi ? "text-amber-500 dark:text-amber-400" : ""}
         ${cell.highlightBg ? "bg-amber-500/15 dark:bg-amber-500/20 rounded px-1" : ""}
       `}
     >
@@ -303,6 +308,7 @@ function CellContent({
 
 /** Fixed month columns for T2: label + date range timestamps. */
 const KPI_MONTH_COLUMNS = [
+  { label: "Kwi 2026", from: "2026-04-01 00:00:00", to: "2026-04-30 23:59:59" },
   { label: "Mar 2026", from: "2026-03-01 00:00:00", to: "2026-03-31 23:59:59" },
   { label: "Lut 2026", from: "2026-02-01 00:00:00", to: "2026-02-28 23:59:59" },
   { label: "Sty 2026", from: "2026-01-01 00:00:00", to: "2026-01-31 23:59:59" },
@@ -315,7 +321,6 @@ const KPI_MONTH_COLUMNS = [
   { label: "Cze 2025", from: "2025-06-01 00:00:00", to: "2025-06-30 23:59:59" },
   { label: "Maj 2025", from: "2025-05-01 00:00:00", to: "2025-05-31 23:59:59" },
   { label: "Kwi 2025", from: "2025-04-01 00:00:00", to: "2025-04-30 23:59:59" },
-  { label: "Mar 2025", from: "2025-03-01 00:00:00", to: "2025-03-31 23:59:59" },
 ] as const;
 
 const KPI_MONTH_COUNT = KPI_MONTH_COLUMNS.length;
@@ -446,24 +451,24 @@ function formatKpiMonthId(from: string): string {
   if (!year || !month) return "??";
 
   // Custom IDs for specific months.
-  if (month === "03" && year === "2026") {
+  if (month === "04" && year === "2026") {
     return "TM";
   }
-  if (month === "03" && year === "2025") {
+  if (month === "04" && year === "2025") {
     return "MR";
   }
   // Compact technical IDs M1..M11 for remaining fixed columns
-  if (month === "02" && year === "2026") return "M1";
-  if (month === "01" && year === "2026") return "M2";
-  if (month === "12" && year === "2025") return "M3";
-  if (month === "11" && year === "2025") return "M4";
-  if (month === "10" && year === "2025") return "M5";
-  if (month === "09" && year === "2025") return "M6";
-  if (month === "08" && year === "2025") return "M7";
-  if (month === "07" && year === "2025") return "M8";
-  if (month === "06" && year === "2025") return "M9";
-  if (month === "05" && year === "2025") return "M10";
-  if (month === "04" && year === "2025") return "M11";
+  if (month === "03" && year === "2026") return "M1";
+  if (month === "02" && year === "2026") return "M2";
+  if (month === "01" && year === "2026") return "M3";
+  if (month === "12" && year === "2025") return "M4";
+  if (month === "11" && year === "2025") return "M5";
+  if (month === "10" && year === "2025") return "M6";
+  if (month === "09" && year === "2025") return "M7";
+  if (month === "08" && year === "2025") return "M8";
+  if (month === "07" && year === "2025") return "M9";
+  if (month === "06" && year === "2025") return "M10";
+  if (month === "05" && year === "2025") return "M11";
 
   // Fallback: MMYY from date.
   return `${month}${year.slice(-2)}`;
@@ -474,11 +479,13 @@ function KpiMonthlyTable({
   showIds = false,
   hidePercent = false,
   hidePln = false,
+  apiTM,
 }: {
   data?: KpiRow[];
   showIds?: boolean;
   hidePercent?: boolean;
   hidePln?: boolean;
+  apiTM?: Record<string, string>;
 }) {
   const columns: ColumnDef<KpiRow>[] = [
     {
@@ -502,27 +509,25 @@ function KpiMonthlyTable({
       accessorFn: (row: KpiRow) => normalizeKpiCells(row.cells)[i],
       cell: ({ row }: { row: { original: KpiRow; index: number } }) => {
         const cells = normalizeKpiCells(row.original.cells);
-        let value = cells[i] ?? "-";
+        const apiVal = i === 0 ? apiTM?.[row.original.id] : undefined;
+        const isApi = apiVal != null && apiVal !== "" && apiVal !== "-";
+        let value = isApi ? (apiVal as string) : (cells[i] ?? "-");
         if (hidePercent && typeof value === "string" && value.endsWith("%")) {
           value = value.slice(0, -1);
         }
-        const isMar2026Column = KPI_MONTH_COLUMNS[i]?.label === "Mar 2026";
         const colId = formatKpiMonthId(col.from);
         const rowLetter = formatRowIndexId(row.index);
         const cellId = `${rowLetter}-${colId}`;
 
-        let content: React.ReactNode;
-        if (isMar2026Column) {
-          content = <span className="text-right tabular-nums">TM</span>;
-        } else {
-          const shouldAppendPln =
-            !hidePln &&
-            KPI_MONEY_ROW_IDS.has(row.original.id) &&
-            value !== "-" &&
-            value !== "x";
-          const formatted = shouldAppendPln ? `${value} zł` : value;
-          content = <span className="text-right tabular-nums">{formatted}</span>;
-        }
+        const shouldAppendPln =
+          !hidePln &&
+          KPI_MONEY_ROW_IDS.has(row.original.id) &&
+          value !== "-" &&
+          value !== "x";
+        const formatted = shouldAppendPln ? `${value} zł` : value;
+        const content: React.ReactNode = (
+          <span className={`text-right tabular-nums ${isApi ? "text-emerald-500 dark:text-emerald-400 font-semibold" : ""}`}>{formatted}</span>
+        );
 
         return (
           <span className="inline-flex min-h-[2.25rem] flex-col items-end justify-end gap-0.5 leading-tight overflow-visible">
@@ -609,7 +614,7 @@ function KpiMonthlyTable({
   );
 }
 
-type YtdRow = { id: string; category: string; ytd: string };
+type YtdRow = { id: string; category: string; ytd: string; fromApi?: boolean };
 
 const ytdSalesData: YtdRow[] = [
   { id: "total", category: "Łącznie", ytd: "-" },
@@ -658,9 +663,10 @@ function YtdSalesTable({
       cell: ({ getValue, row }) => {
         let ytd = (getValue() as string) ?? "";
         if (hidePln) ytd = ytd.replace(/\s*zł\s*$/, "");
+        const isApi = !!row.original.fromApi;
         return (
           <span className="inline-flex flex-col items-end gap-0.5">
-            <span className="text-right tabular-nums">{ytd}</span>
+            <span className={`text-right tabular-nums ${isApi ? "text-emerald-500 dark:text-emerald-400 font-semibold" : ""}`}>{ytd}</span>
             {showIds && (
               <span className="block mt-0.5 text-muted-foreground text-xs">
                 ID:{row.original.id}-ytd
@@ -762,16 +768,9 @@ function ReportTable({
           row.original.id
         );
         const cellId = getT1MonthCellId(baseYearTwoDigits, month.id);
-        const isSpecial2026 =
-          baseYearTwoDigits === "TY" &&
-          (month.id === "03" ? "TM" : month.id === "04" ? "NM" : null);
         return (
           <span className="inline-flex flex-col items-end leading-tight">
-            {isSpecial2026 ? (
-              <span className="text-right tabular-nums">{isSpecial2026}</span>
-            ) : (
-              <CellContent cell={row.original.cells[i]} hidePercent={hidePercent} />
-            )}
+            <CellContent cell={row.original.cells[i]} hidePercent={hidePercent} />
             {showIds && (
               <span className="text-muted-foreground text-xs">ID:{cellId}</span>
             )}
@@ -1355,6 +1354,36 @@ export function App() {
   const [t1Data, setT1Data] = useState<ReportRow[]>(reportData);
   const [t2Data, setT2Data] = useState<KpiRow[]>(kpiMonthlyData);
   const [t5Data, setT5Data] = useState<YtdRow[]>(ytdSalesData);
+  const [t2ApiTM, setT2ApiTM] = useState<Record<string, string>>({});
+
+  const TM_YEAR_ID = "2026";
+  const TM_MONTH_INDEX = 3; // April
+
+  function applyT1Api(value: string) {
+    setT1Data((prev) =>
+      prev.map((r) =>
+        r.id === TM_YEAR_ID
+          ? {
+              ...r,
+              cells: r.cells.map((c, i) =>
+                i === TM_MONTH_INDEX ? { value, fromApi: true } : c
+              ),
+            }
+          : r
+      )
+    );
+  }
+
+  function applyT5Api(rows: Array<{ id: string; category: string; ytd: string }>) {
+    setT5Data((prev) => {
+      const byId = new Map(rows.map((r) => [r.id, r] as const));
+      return prev.map((r) =>
+        byId.has(r.id)
+          ? { ...r, ytd: byId.get(r.id)!.ytd, fromApi: true }
+          : r
+      );
+    });
+  }
   const [dataError, setDataError] = useState<Record<string, boolean>>({
     t1: false,
     t2: false,
@@ -1400,6 +1429,7 @@ export function App() {
     if (t2SelectedLists.length === 0) return;
     const orgId = t2OrgId ?? t2Aliases[0]?.organizationId;
     const load = async () => {
+      setT2ApiTM({});
       setDataError((e) => ({ ...e, t2: false }));
       if (t2SelectedLists.length === 1 && orgId) {
         const listId = LIST_ID_BY_NAME[t2SelectedLists[0]] ?? "L1";
@@ -1466,15 +1496,19 @@ export function App() {
     };
   }, [t5SelectedLists, t5OrgId]);
 
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   const t1Base = dataError.t1
-    ? reportData.map((r) => ({ ...r, cells: r.cells.map(() => ({ value: "x" })) }))
+    ? reportData.map((r) => ({ ...r, cells: r.cells.map(() => ({ value: "-" })) }))
     : t1Data;
   const t1Display = ensureT1RowsComplete(t1Base, reportData);
   const t2Display = dataError.t2
-    ? kpiMonthlyData.map((r) => ({ ...r, cells: Array(KPI_MONTH_COUNT).fill("x") }))
+    ? kpiMonthlyData.map((r) => ({ ...r, cells: Array(KPI_MONTH_COUNT).fill("-") }))
     : t2Data;
   const t5Display = dataError.t5
-    ? ytdSalesData.map((r) => ({ ...r, ytd: "x" }))
+    ? ytdSalesData.map((r) => ({ ...r, ytd: "-" }))
     : t5Data;
 
   return (
@@ -1527,7 +1561,17 @@ export function App() {
             <img src="/vite.svg" alt="Logo" className="size-8" />
             <span className="font-semibold text-lg">Combo Raport</span>
           </div>
-          <DarkModeToggle />
+          <div className="flex items-center gap-2">
+            <DarkModeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Konto użytkownika"
+              className="rounded-full"
+            >
+              <UserCircle className="size-5 text-muted-foreground" />
+            </Button>
+          </div>
         </div>
       </header>
       <main className="flex-1">
@@ -1547,7 +1591,8 @@ export function App() {
               setNameAlias={setT1NameAlias}
             />
           </div>
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <FetchButton table="t1" orgId={t1OrgId} onT1Result={applyT1Api} />
             <TableVisibilityToggles
               visibility={t1Visibility}
               onVisibilityChange={setT1Visibility}
@@ -1577,7 +1622,8 @@ export function App() {
               Nie udało się załadować danych T2. Sprawdź wybór listy i lokalizacji.
             </p>
           )}
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <FetchButton table="t2" orgId={t2OrgId} onT2Result={(cells) => setT2ApiTM(cells)} />
             <TableVisibilityToggles
               visibility={t2Visibility}
               onVisibilityChange={setT2Visibility}
@@ -1587,6 +1633,7 @@ export function App() {
             showIds={t2Visibility.showId}
             hidePercent={!t2Visibility.showPercent}
             hidePln={!t2Visibility.showPln}
+            apiTM={t2ApiTM}
             data={t2Display
               .filter((r) => T2_ALLOWED_ROW_IDS.has(r.id))
               .sort(
@@ -1613,7 +1660,8 @@ export function App() {
                 setNameAlias={setT5NameAlias}
               />
             </div>
-            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <FetchButton table="t5" orgId={t5OrgId} onT5Result={applyT5Api} />
             <TableVisibilityToggles
               visibility={t5Visibility}
               onVisibilityChange={setT5Visibility}
@@ -1631,9 +1679,30 @@ export function App() {
         </div>
       </main>
       <footer className="border-t border-border bg-muted/30 px-4 py-4 mt-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
           <span>© {new Date().getFullYear()} Combo Raport. Dane wyłącznie informacyjne.</span>
-          <span>Wersja 0.0.1</span>
+          <div className="flex items-center gap-3">
+            <a
+              href="/"
+              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+            >
+              <Home className="size-3.5" />
+              <span>Strona główna</span>
+            </a>
+            <span>·</span>
+            <span>Wersja 0.0.1</span>
+            <span>·</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={scrollToTop}
+              className="h-7 gap-1.5 px-2"
+              aria-label="Wróć na górę"
+            >
+              <ArrowUp className="size-3.5" />
+              <span>Góra</span>
+            </Button>
+          </div>
         </div>
       </footer>
     </div>
