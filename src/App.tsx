@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useReactTable,
   getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
   flexRender,
   type ColumnDef,
+  type SortingState,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -31,9 +35,41 @@ import {
   SidebarSeparator,
   SidebarInset,
 } from "@/components/ui/sidebar";
-import { UserCircle, Home, ArrowUp } from "lucide-react";
+import {
+  UserCircle,
+  Home,
+  ArrowUp,
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp as ArrowUpIcon,
+  Columns3,
+  User,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FetchButton } from "@/components/fetch-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipTrigger,
+  InfoTooltipContent,
+} from "@/components/ui/tooltip";
+import { loggedFetch } from "@/lib/loggedFetch";
+import { useLogContext } from "@/contexts/useLog";
+import { TableConsole } from "@/components/TableConsole";
+import { GOPOS_ROW_SLUGS, GOPOS_T1_COL_SLUGS, GOPOS_T2_COL_SLUGS } from "@/lib/gopos-slugs";
+import { T1VolumeChart } from "@/components/charts/T1VolumeChart";
+import { T2KpiChart } from "@/components/charts/T2KpiChart";
+import { T5YtdChart } from "@/components/charts/T5YtdChart";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -487,26 +523,72 @@ function KpiMonthlyTable({
   hidePln?: boolean;
   apiTM?: Record<string, string>;
 }) {
-  const columns: ColumnDef<KpiRow>[] = [
+  const [sorting, setSorting] = useState<SortingState>([{ id: "month-0", desc: true }]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [expanded, setExpanded] = useState(false);
+
+  const columns: ColumnDef<KpiRow>[] = useMemo(() => [
     {
       accessorKey: "label",
-      header: () => <span className="invisible">row</span>,
+      header: () => <span className="text-xs text-muted-foreground">Wskaźnik</span>,
+      enableSorting: false,
       cell: ({ row, getValue }) => {
         const labelId = showIds ? formatRowIndexId(row.index) : undefined;
-        return <KpiLabelCell label={getValue() as string} labelId={labelId} />;
+        const slug = GOPOS_ROW_SLUGS[row.original.id];
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex flex-col leading-tight cursor-help">
+                <KpiLabelCell label={getValue() as string} labelId={labelId} />
+                <SlugBadge slug={slug} />
+              </span>
+            </TooltipTrigger>
+            <InfoTooltipContent side="right">
+              <strong className="text-sm">{getValue() as string}</strong>
+              <span className="text-xs">Row id: <code>{row.original.id}</code></span>
+              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+            </InfoTooltipContent>
+          </Tooltip>
+        );
       },
     },
     ...KPI_MONTH_COLUMNS.map((col, i) => ({
       id: `month-${i}`,
-      header: () => (
-        <span className="inline-flex flex-col items-end leading-tight whitespace-nowrap">
-          <span>{formatKpiMonthDisplay(col.from)}</span>
-          {showIds && (
-            <span className="text-muted-foreground text-xs">{`ID:${formatKpiMonthId(col.from)}`}</span>
-          )}
-        </span>
-      ),
-      accessorFn: (row: KpiRow) => normalizeKpiCells(row.cells)[i],
+      accessorFn: (row: KpiRow) => normalizeKpiCells(row.cells)[i] ?? "-",
+      sortingFn: (a: { original: KpiRow }, b: { original: KpiRow }) => {
+        return parseNumericForSort(normalizeKpiCells(a.original.cells)[i] ?? "") -
+          parseNumericForSort(normalizeKpiCells(b.original.cells)[i] ?? "");
+      },
+      header: ({ column }: { column: { getToggleSortingHandler: () => ((e: unknown) => void) | undefined; getIsSorted: () => false | "asc" | "desc" } }) => {
+        const colId = formatKpiMonthId(col.from);
+        const slug = GOPOS_T2_COL_SLUGS[colId];
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={column.getToggleSortingHandler()}
+                className="inline-flex flex-col items-end leading-tight whitespace-nowrap cursor-pointer select-none"
+              >
+                <span className="flex items-center">
+                  {formatKpiMonthDisplay(col.from)}
+                  <SortIndicator state={column.getIsSorted()} />
+                </span>
+                {showIds && (
+                  <span className="text-muted-foreground text-xs">ID:{colId}</span>
+                )}
+                <SlugBadge slug={slug} />
+              </button>
+            </TooltipTrigger>
+            <InfoTooltipContent>
+              <strong className="text-sm">{formatKpiMonthDisplay(col.from)}</strong>
+              <span className="text-xs">ID kolumny: <code>{colId}</code></span>
+              <span className="text-xs">Zakres: {col.from.slice(0, 10)} → {col.to.slice(0, 10)}</span>
+              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+            </InfoTooltipContent>
+          </Tooltip>
+        );
+      },
       cell: ({ row }: { row: { original: KpiRow; index: number } }) => {
         const cells = normalizeKpiCells(row.original.cells);
         const apiVal = i === 0 ? apiTM?.[row.original.id] : undefined;
@@ -525,52 +607,106 @@ function KpiMonthlyTable({
           value !== "-" &&
           value !== "x";
         const formatted = shouldAppendPln ? `${value} zł` : value;
-        const content: React.ReactNode = (
-          <span className={`text-right tabular-nums ${isApi ? "text-emerald-500 dark:text-emerald-400 font-semibold" : ""}`}>{formatted}</span>
-        );
+        const rowSlug = GOPOS_ROW_SLUGS[row.original.id];
+        const colSlug = GOPOS_T2_COL_SLUGS[colId];
 
         return (
-          <span className="inline-flex min-h-[2.25rem] flex-col items-end justify-end gap-0.5 leading-tight overflow-visible">
-            {content}
-            {showIds && (
-              <span className="block mt-0.5 text-muted-foreground text-xs">
-                ID:{cellId}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex min-h-[2.25rem] flex-col items-end justify-end gap-0.5 leading-tight overflow-visible cursor-help">
+                <span className={`text-right tabular-nums ${isApi ? "text-emerald-500 dark:text-emerald-400 font-semibold" : ""}`}>{formatted}</span>
+                {showIds && (
+                  <span className="block mt-0.5 text-muted-foreground text-xs">
+                    ID:{cellId}
+                  </span>
+                )}
               </span>
-            )}
-          </span>
+            </TooltipTrigger>
+            <InfoTooltipContent>
+              <strong className="text-sm">{formatted}</strong>
+              <span className="text-xs">Cell ID: <code>{cellId}</code></span>
+              <span className="text-xs">Wiersz: {row.original.label}{rowSlug ? ` (${rowSlug})` : ""}</span>
+              <span className="text-xs">Kolumna: {formatKpiMonthDisplay(col.from)}{colSlug ? ` (${colSlug})` : ""}</span>
+              {isApi && <span className="text-xs text-emerald-500">Wartość z GOPOS API</span>}
+            </InfoTooltipContent>
+          </Tooltip>
         );
       },
     })),
-  ];
+  ], [showIds, hidePercent, hidePln, apiTM]);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns non-memoizable functions by design
   const table = useReactTable({
     data,
     columns,
+    state: { sorting, columnVisibility, columnPinning: { left: ["label"] } },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: DEFAULT_PAGE_SIZE } },
   });
 
+  useEffect(() => {
+    table.setPageSize(expanded ? data.length || DEFAULT_PAGE_SIZE : DEFAULT_PAGE_SIZE);
+  }, [expanded, data.length, table]);
+
+  const totalRows = data.length;
+  const showExpandButton = totalRows > DEFAULT_PAGE_SIZE;
+  const hideableColumns = table.getAllLeafColumns().filter((c) => c.id !== "label");
+
   return (
-    <div className="w-full overflow-x-auto rounded-lg border border-border bg-card">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-end gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8">
+              <Columns3 className="size-3.5 mr-1" /> Kolumny
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+            <DropdownMenuLabel>Widoczne kolumny</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {hideableColumns.map((col) => {
+              const idx = col.id.startsWith("month-") ? Number(col.id.replace("month-", "")) : -1;
+              const label = idx >= 0 ? formatKpiMonthDisplay(KPI_MONTH_COLUMNS[idx].from) : col.id;
+              return (
+                <DropdownMenuCheckboxItem
+                  key={col.id}
+                  checked={col.getIsVisible()}
+                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                >
+                  {label}
+                </DropdownMenuCheckboxItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="w-full overflow-x-auto rounded-lg border border-border bg-card">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  className={
-                    header.column.id === "label"
-                      ? "w-60 max-w-60 whitespace-normal break-words px-2 py-1 text-xs"
-                      : "w-24 max-w-24 whitespace-normal break-words px-2 py-1 text-xs text-right align-top"
-                  }
-                >
-                  {flexRender(
-                    header.column.columnDef.header,
-                    header.getContext()
-                  )}
-                </TableHead>
-              ))}
+              {headerGroup.headers.map((header) => {
+                const isLabel = header.column.id === "label";
+                return (
+                  <TableHead
+                    key={header.id}
+                    className={
+                      isLabel
+                        ? "w-60 max-w-60 whitespace-normal break-words px-2 py-1 text-xs sticky left-0 z-10 bg-card"
+                        : "w-24 max-w-24 whitespace-normal break-words px-2 py-1 text-xs text-right align-top"
+                    }
+                  >
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           ))}
         </TableHeader>
@@ -580,7 +716,8 @@ function KpiMonthlyTable({
             return (
               <TableRow key={row.id}>
                 {row.getVisibleCells().map((cell) => {
-                  const colId = cell.column.id === "label"
+                  const isLabel = cell.column.id === "label";
+                  const colId = isLabel
                     ? "label"
                     : cell.column.id.startsWith("month-")
                       ? formatKpiMonthId(KPI_MONTH_COLUMNS[Number(cell.column.id.replace("month-", ""))]?.from ?? "")
@@ -591,11 +728,10 @@ function KpiMonthlyTable({
                       key={cell.id}
                       id={cellDomId}
                       data-cell-id={colId}
-                      title={cellDomId}
                       className={
-                        cell.column.id !== "label"
-                          ? "w-24 max-w-24 min-h-10 overflow-visible whitespace-normal break-words px-2 py-1 text-right align-top"
-                          : "w-60 max-w-60 whitespace-normal break-words px-2 py-1"
+                        isLabel
+                          ? "w-60 max-w-60 whitespace-normal break-words px-2 py-1 sticky left-0 z-[1] bg-card"
+                          : "w-24 max-w-24 min-h-10 overflow-visible whitespace-normal break-words px-2 py-1 text-right align-top"
                       }
                     >
                       {flexRender(
@@ -610,6 +746,20 @@ function KpiMonthlyTable({
           })}
         </TableBody>
       </Table>
+      </div>
+      {showExpandButton && (
+        <div className="flex justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded
+              ? "Zwiń"
+              : `Zobacz więcej (${totalRows - DEFAULT_PAGE_SIZE})`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -719,6 +869,31 @@ function YtdSalesTable({
   );
 }
 
+const DEFAULT_PAGE_SIZE = 6;
+
+type SortIndicatorProps = { state: false | "asc" | "desc" };
+function SortIndicator({ state }: SortIndicatorProps) {
+  if (state === "asc") return <ArrowUpIcon className="inline size-3 ml-1 text-foreground" />;
+  if (state === "desc") return <ArrowDown className="inline size-3 ml-1 text-foreground" />;
+  return <ArrowUpDown className="inline size-3 ml-1 text-muted-foreground/60" />;
+}
+
+function SlugBadge({ slug }: { slug?: string }) {
+  if (!slug) return null;
+  return (
+    <code className="block font-mono text-[10px] text-syntax-slug leading-tight">
+      {slug}
+    </code>
+  );
+}
+
+function parseNumericForSort(raw: string): number {
+  if (!raw || raw === "-" || raw === "X" || raw === "x") return Number.NEGATIVE_INFINITY;
+  const cleaned = raw.replace(/\s/g, "").replace(/%/g, "").replace(/zł/g, "").replace(",", ".");
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : Number.NEGATIVE_INFINITY;
+}
+
 function ReportTable({
   data = reportData,
   showIds = true,
@@ -728,79 +903,129 @@ function ReportTable({
   showIds?: boolean;
   hidePercent?: boolean;
 }) {
-  const columns: ColumnDef<ReportRow>[] = [
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [expanded, setExpanded] = useState(false);
+
+  const columns: ColumnDef<ReportRow>[] = useMemo(() => [
     {
       accessorKey: "label",
-      header: () => (
-        <span className="inline-flex flex-col leading-tight">
-          <span className="text-xs text-muted-foreground">&nbsp;</span>
-        </span>
-      ),
+      header: () => <span className="text-xs text-muted-foreground">Wiersz</span>,
+      enableSorting: false,
       cell: ({ getValue, row }) => {
         const label = getValue() as string;
         const displayId = getDisplayRowId(label, row.original.id);
+        const slug = GOPOS_ROW_SLUGS[row.original.id];
         return (
-          <span className="inline-flex flex-col leading-tight">
-            <span className="font-medium">{label}</span>
-            {showIds && (
-              <span className="text-muted-foreground text-xs">
-                ID:{displayId}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex flex-col leading-tight cursor-help">
+                <span className="font-medium">{label}</span>
+                {showIds && (
+                  <span className="text-muted-foreground text-xs">ID:{displayId}</span>
+                )}
+                <SlugBadge slug={slug} />
               </span>
-            )}
-          </span>
+            </TooltipTrigger>
+            <InfoTooltipContent side="right">
+              <strong className="text-sm">{label}</strong>
+              <span className="text-xs">ID wiersza: <code>{displayId}</code></span>
+              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+              <span className="text-xs text-muted-foreground">Raw id: {row.original.id}</span>
+            </InfoTooltipContent>
+          </Tooltip>
         );
       },
     },
     ...MONTHS.map((month, i) => ({
       id: `month-${i}`,
-      header: () => (
-        <span className="inline-flex flex-col items-end leading-tight">
-          <span>{month.label}</span>
-          {showIds && (
-            <span className="text-muted-foreground text-xs">ID:{month.id}</span>
-          )}
-        </span>
-      ),
-      accessorFn: (row: ReportRow) => row.cells[i],
+      accessorFn: (row: ReportRow) => row.cells[i]?.value ?? "-",
+      sortingFn: (a: { original: ReportRow }, b: { original: ReportRow }) => {
+        return parseNumericForSort(a.original.cells[i]?.value ?? "") -
+          parseNumericForSort(b.original.cells[i]?.value ?? "");
+      },
+      header: ({ column }: { column: { getToggleSortingHandler: () => ((e: unknown) => void) | undefined; getIsSorted: () => false | "asc" | "desc" } }) => {
+        const slug = GOPOS_T1_COL_SLUGS[month.id];
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={column.getToggleSortingHandler()}
+                className="inline-flex flex-col items-end leading-tight cursor-pointer select-none"
+              >
+                <span className="flex items-center">
+                  {month.label}
+                  <SortIndicator state={column.getIsSorted()} />
+                </span>
+                {showIds && (
+                  <span className="text-muted-foreground text-xs">ID:{month.id}</span>
+                )}
+                <SlugBadge slug={slug} />
+              </button>
+            </TooltipTrigger>
+            <InfoTooltipContent>
+              <strong className="text-sm">{month.label}</strong>
+              <span className="text-xs">ID kolumny: <code>{month.id}</code></span>
+              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+            </InfoTooltipContent>
+          </Tooltip>
+        );
+      },
       cell: ({ row }: { row: { original: ReportRow } }) => {
         const baseYearTwoDigits = getBaseYearTwoDigits(
           row.original.label,
           row.original.id
         );
         const cellId = getT1MonthCellId(baseYearTwoDigits, month.id);
+        const cell = row.original.cells[i];
+        const slug = GOPOS_T1_COL_SLUGS[month.id];
+        const rowSlug = GOPOS_ROW_SLUGS[row.original.id];
         return (
-          <span className="inline-flex flex-col items-end leading-tight">
-            <CellContent cell={row.original.cells[i]} hidePercent={hidePercent} />
-            {showIds && (
-              <span className="text-muted-foreground text-xs">ID:{cellId}</span>
-            )}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex flex-col items-end leading-tight cursor-help">
+                <CellContent cell={cell} hidePercent={hidePercent} />
+                {showIds && (
+                  <span className="text-muted-foreground text-xs">ID:{cellId}</span>
+                )}
+              </span>
+            </TooltipTrigger>
+            <InfoTooltipContent>
+              <strong className="text-sm">{cell?.value ?? "-"}</strong>
+              <span className="text-xs">Cell ID: <code>{cellId}</code></span>
+              <span className="text-xs">Wiersz: {row.original.label}{rowSlug ? ` (${rowSlug})` : ""}</span>
+              <span className="text-xs">Kolumna: {month.label}{slug ? ` (${slug})` : ""}</span>
+              {cell?.fromApi && <span className="text-xs text-emerald-500">Wartość z GOPOS API</span>}
+            </InfoTooltipContent>
+          </Tooltip>
         );
       },
     })),
     {
       id: "suma",
-      header: () => (
-        <span className="inline-flex flex-col items-end leading-tight">
-          <span>Suma</span>
-          {showIds && (
-            <span className="text-muted-foreground text-xs">ID:SUM</span>
-          )}
-        </span>
+      accessorFn: (row: ReportRow) => row.cells[12]?.value ?? "-",
+      sortingFn: (a, b) => parseNumericForSort(a.original.cells[12]?.value ?? "") - parseNumericForSort(b.original.cells[12]?.value ?? ""),
+      header: ({ column }) => (
+        <button
+          type="button"
+          onClick={column.getToggleSortingHandler()}
+          className="inline-flex flex-col items-end leading-tight cursor-pointer select-none"
+        >
+          <span className="flex items-center">
+            Suma
+            <SortIndicator state={column.getIsSorted()} />
+          </span>
+          {showIds && <span className="text-muted-foreground text-xs">ID:SUM</span>}
+          <SlugBadge slug={GOPOS_T1_COL_SLUGS.suma} />
+        </button>
       ),
-      accessorFn: (row: ReportRow) => row.cells[12],
-      cell: ({ row }: { row: { original: ReportRow } }) => (
+      cell: ({ row }) => (
         <span className="inline-flex flex-col items-end leading-tight">
           <CellContent cell={row.original.cells[12]} hidePercent={hidePercent} />
           {showIds && (
             <span className="text-muted-foreground text-xs">
-              {(() => {
-                const baseYearTwoDigits = getBaseYearTwoDigits(
-                  row.original.label,
-                  row.original.id
-                );
-                return `ID:${baseYearTwoDigits}SUM`;
-              })()}
+              ID:{getBaseYearTwoDigits(row.original.label, row.original.id)}SUM
             </span>
           )}
         </span>
@@ -808,49 +1033,95 @@ function ReportTable({
     },
     {
       id: "srednia",
-      header: () => (
-        <span className="inline-flex flex-col items-end leading-tight">
-          <span>Średnia</span>
-          {showIds && (
-            <span className="text-muted-foreground text-xs">ID:AVG</span>
-          )}
-        </span>
+      accessorFn: (row: ReportRow) => row.cells[13]?.value ?? "-",
+      sortingFn: (a, b) => parseNumericForSort(a.original.cells[13]?.value ?? "") - parseNumericForSort(b.original.cells[13]?.value ?? ""),
+      header: ({ column }) => (
+        <button
+          type="button"
+          onClick={column.getToggleSortingHandler()}
+          className="inline-flex flex-col items-end leading-tight cursor-pointer select-none"
+        >
+          <span className="flex items-center">
+            Średnia
+            <SortIndicator state={column.getIsSorted()} />
+          </span>
+          {showIds && <span className="text-muted-foreground text-xs">ID:AVG</span>}
+          <SlugBadge slug={GOPOS_T1_COL_SLUGS.srednia} />
+        </button>
       ),
-      accessorFn: (row: ReportRow) => row.cells[13],
-      cell: ({ row }: { row: { original: ReportRow } }) => (
+      cell: ({ row }) => (
         <span className="inline-flex flex-col items-end leading-tight">
           <CellContent cell={row.original.cells[13]} hidePercent={hidePercent} />
           {showIds && (
             <span className="text-muted-foreground text-xs">
-              {(() => {
-                const baseYearTwoDigits = getBaseYearTwoDigits(
-                  row.original.label,
-                  row.original.id
-                );
-                return `ID:${baseYearTwoDigits}AVG`;
-              })()}
+              ID:{getBaseYearTwoDigits(row.original.label, row.original.id)}AVG
             </span>
           )}
         </span>
       ),
     },
-  ];
+  ], [showIds, hidePercent]);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns non-memoizable functions by design
   const table = useReactTable({
     data,
     columns,
+    state: { sorting, columnVisibility, columnPinning: { left: ["label"] } },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: DEFAULT_PAGE_SIZE } },
   });
 
+  useEffect(() => {
+    table.setPageSize(expanded ? data.length || DEFAULT_PAGE_SIZE : DEFAULT_PAGE_SIZE);
+  }, [expanded, data.length, table]);
+
+  const totalRows = data.length;
+  const showExpandButton = totalRows > DEFAULT_PAGE_SIZE;
+
+  const hideableColumns = table.getAllLeafColumns().filter((c) => c.id !== "label");
+
   return (
-    <div className="w-full overflow-x-auto rounded-lg border border-border bg-card">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-end gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8">
+              <Columns3 className="size-3.5 mr-1" /> Kolumny
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+            <DropdownMenuLabel>Widoczne kolumny</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {hideableColumns.map((col) => {
+              const idx = col.id.startsWith("month-") ? Number(col.id.replace("month-", "")) : -1;
+              const label = idx >= 0 ? MONTHS[idx].label : col.id === "suma" ? "Suma" : col.id === "srednia" ? "Średnia" : col.id;
+              return (
+                <DropdownMenuCheckboxItem
+                  key={col.id}
+                  checked={col.getIsVisible()}
+                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                >
+                  {label}
+                </DropdownMenuCheckboxItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="w-full overflow-x-auto rounded-lg border border-border bg-card">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="whitespace-nowrap">
+                <TableHead
+                  key={header.id}
+                  className={`whitespace-nowrap ${header.column.id === "label" ? "sticky left-0 z-10 bg-card" : ""}`}
+                >
                   {flexRender(
                     header.column.columnDef.header,
                     header.getContext()
@@ -872,6 +1143,7 @@ function ReportTable({
               rowOriginal.id
             );
             const isVsRow = displayId === "VS1" || displayId === "VS2";
+            const rowBg = isVsRow ? "bg-green-100 dark:bg-green-950/50" : "bg-card";
 
             return (
               <TableRow
@@ -892,8 +1164,6 @@ function ReportTable({
                   } else if (columnId.startsWith("month-")) {
                     const idx = Number(columnId.replace("month-", ""));
                     const monthCode = MONTHS[idx]?.id ?? "00";
-
-                    // Example: 2026 + March(03) => TYTM, 2026 + January(01) => TY01
                     cellDataId = getT1MonthCellId(baseYearTwoDigits, monthCode);
                     domId = `t1-cell-${rowOriginal.id}-${cellDataId}`;
                   } else if (columnId === "suma") {
@@ -907,14 +1177,13 @@ function ReportTable({
                     domId = `t1-cell-${rowOriginal.id}-${cellDataId}`;
                   }
 
+                  const isLabel = cell.column.id === "label";
                   return (
                     <TableCell
                       key={cell.id}
                       id={domId}
                       data-cell-id={cellDataId}
-                      className={
-                        cell.column.id !== "label" ? "text-right" : undefined
-                      }
+                      className={`${!isLabel ? "text-right" : ""} ${isLabel ? `sticky left-0 z-[1] ${rowBg}` : ""}`}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -928,6 +1197,20 @@ function ReportTable({
           })}
         </TableBody>
       </Table>
+      </div>
+      {showExpandButton && (
+        <div className="flex justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded
+              ? "Zwiń"
+              : `Zobacz więcej (${totalRows - DEFAULT_PAGE_SIZE})`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1310,6 +1593,7 @@ function mergeYtdRows(rowsArrays: YtdRow[][]): YtdRow[] {
 }
 
 export function App() {
+  const { pushLog } = useLogContext();
   const [t1SelectedLists, setT1SelectedLists] = useState<string[]>([initialListName]);
   const [t1NameAlias, setT1NameAlias] = useState<string>(initialNameAlias);
   const [t2SelectedLists, setT2SelectedLists] = useState<string[]>([initialListName]);
@@ -1397,9 +1681,8 @@ export function App() {
       setDataError((e) => ({ ...e, t1: false }));
       if (t1SelectedLists.length === 1 && t1OrgId) {
         const listId = LIST_ID_BY_NAME[t1SelectedLists[0]] ?? "L1";
-        const r = await fetch(`${T1_DATA_BASE}/T1${listId}${t1OrgId}.json`).then((res) =>
-          res.ok ? res.json() : null
-        );
+        const res = await loggedFetch(`${T1_DATA_BASE}/T1${listId}${t1OrgId}.json`, { tableId: "T1", sink: pushLog });
+        const r = res && res.ok ? await res.json() : null;
         if (!cancelled && Array.isArray(r)) setT1Data(r);
         else if (!cancelled) setDataError((e) => ({ ...e, t1: true }));
       } else if (t1SelectedLists.length > 1) {
@@ -1409,9 +1692,8 @@ export function App() {
           const orgId = aliases[0]?.organizationId;
           if (!orgId) continue;
           const listId = LIST_ID_BY_NAME[listName] ?? "L1";
-          const r = await fetch(`${T1_DATA_BASE}/T1${listId}${orgId}.json`).then((res) =>
-            res.ok ? res.json() : null
-          );
+          const res = await loggedFetch(`${T1_DATA_BASE}/T1${listId}${orgId}.json`, { tableId: "T1", sink: pushLog });
+          const r = res && res.ok ? await res.json() : null;
           if (Array.isArray(r)) results.push(r);
         }
         if (!cancelled && results.length > 0) setT1Data(mergeReportRows(results));
@@ -1422,7 +1704,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [t1SelectedLists, t1OrgId]);
+  }, [t1SelectedLists, t1OrgId, pushLog]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1434,8 +1716,8 @@ export function App() {
       if (t2SelectedLists.length === 1 && orgId) {
         const listId = LIST_ID_BY_NAME[t2SelectedLists[0]] ?? "L1";
         const url = `${T2_DATA_BASE}/T2${listId}${orgId}.json`;
-        const res = await fetch(url);
-        const r = res.ok ? await res.json() : null;
+        const res = await loggedFetch(url, { tableId: "T2", sink: pushLog });
+        const r = res && res.ok ? await res.json() : null;
         if (!cancelled && Array.isArray(r))
           setT2Data(r.filter((row) => T2_ALLOWED_ROW_IDS.has(row.id)));
         else if (!cancelled) setDataError((e) => ({ ...e, t2: true }));
@@ -1446,9 +1728,8 @@ export function App() {
           const oid = aliases[0]?.organizationId;
           if (!oid) continue;
           const listId = LIST_ID_BY_NAME[listName] ?? "L1";
-          const r = await fetch(`${T2_DATA_BASE}/T2${listId}${oid}.json`).then((res) =>
-            res.ok ? res.json() : null
-          );
+          const res = await loggedFetch(`${T2_DATA_BASE}/T2${listId}${oid}.json`, { tableId: "T2", sink: pushLog });
+          const r = res && res.ok ? await res.json() : null;
           if (Array.isArray(r)) results.push(r);
         }
         if (!cancelled && results.length > 0)
@@ -1460,7 +1741,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [t2SelectedLists, t2OrgId, t2Aliases]);
+  }, [t2SelectedLists, t2OrgId, t2Aliases, pushLog]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1469,9 +1750,8 @@ export function App() {
       setDataError((e) => ({ ...e, t5: false }));
       if (t5SelectedLists.length === 1 && t5OrgId) {
         const listId = LIST_ID_BY_NAME[t5SelectedLists[0]] ?? "L1";
-        const r = await fetch(`${DATA_BASE}/T5${listId}${t5OrgId}.json`).then((res) =>
-          res.ok ? res.json() : null
-        );
+        const res = await loggedFetch(`${DATA_BASE}/T5${listId}${t5OrgId}.json`, { tableId: "T5", sink: pushLog });
+        const r = res && res.ok ? await res.json() : null;
         if (!cancelled && Array.isArray(r)) setT5Data(r);
         else if (!cancelled) setDataError((e) => ({ ...e, t5: true }));
       } else if (t5SelectedLists.length > 1) {
@@ -1481,9 +1761,8 @@ export function App() {
           const orgId = aliases[0]?.organizationId;
           if (!orgId) continue;
           const listId = LIST_ID_BY_NAME[listName] ?? "L1";
-          const r = await fetch(`${DATA_BASE}/T5${listId}${orgId}.json`).then((res) =>
-            res.ok ? res.json() : null
-          );
+          const res = await loggedFetch(`${DATA_BASE}/T5${listId}${orgId}.json`, { tableId: "T5", sink: pushLog });
+          const r = res && res.ok ? await res.json() : null;
           if (Array.isArray(r)) results.push(r);
         }
         if (!cancelled && results.length > 0) setT5Data(mergeYtdRows(results));
@@ -1494,7 +1773,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [t5SelectedLists, t5OrgId]);
+  }, [t5SelectedLists, t5OrgId, pushLog]);
 
   function scrollToTop() {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1527,25 +1806,31 @@ export function App() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <a href="#t1">
-                      <span>T1 — Wolumen miesięczny</span>
-                    </a>
-                  </SidebarMenuButton>
+                  <SidebarMenuButton
+                    render={
+                      <a href="#t1">
+                        <span>T1 — Wolumen miesięczny</span>
+                      </a>
+                    }
+                  />
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <a href="#t2">
-                      <span>T2 — KPI miesięczne</span>
-                    </a>
-                  </SidebarMenuButton>
+                  <SidebarMenuButton
+                    render={
+                      <a href="#t2">
+                        <span>T2 — KPI miesięczne</span>
+                      </a>
+                    }
+                  />
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <a href="#t5">
-                      <span>T5 — Sprzedaż YTD</span>
-                    </a>
-                  </SidebarMenuButton>
+                  <SidebarMenuButton
+                    render={
+                      <a href="#t5">
+                        <span>T5 — Sprzedaż YTD</span>
+                      </a>
+                    }
+                  />
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
@@ -1563,14 +1848,32 @@ export function App() {
           </div>
           <div className="flex items-center gap-2">
             <DarkModeToggle />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Konto użytkownika"
-              className="rounded-full"
-            >
-              <UserCircle className="size-5 text-muted-foreground" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Konto użytkownika"
+                  className="rounded-full"
+                >
+                  <UserCircle className="size-5 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Gość</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <User className="size-4 mr-2" /> Profil
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Settings className="size-4 mr-2" /> Ustawienia
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <LogOut className="size-4 mr-2" /> Wyloguj
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -1599,11 +1902,15 @@ export function App() {
               hasPln={false}
             />
           </div>
+          <div className="mb-4 rounded-lg border border-border bg-card p-3">
+            <T1VolumeChart data={t1Display} />
+          </div>
           <ReportTable
             data={t1Display}
             showIds={t1Visibility.showId}
             hidePercent={!t1Visibility.showPercent}
           />
+          <TableConsole tableId="T1" />
         </section>
         <section id="t2" data-table-id={TABLE_IDS.T2}>
           <h2 className="text-xl font-semibold mb-1">
@@ -1629,6 +1936,15 @@ export function App() {
               onVisibilityChange={setT2Visibility}
             />
           </div>
+          <div className="mb-4 rounded-lg border border-border bg-card p-3">
+            <T2KpiChart
+              data={t2Display.filter((r) => T2_ALLOWED_ROW_IDS.has(r.id)).map((r) => ({
+                ...r,
+                label: KPI_LABELS_T2_T3[r.id] ?? r.label,
+              }))}
+              monthLabels={KPI_MONTH_COLUMNS.map((c) => formatKpiMonthDisplay(c.from))}
+            />
+          </div>
           <KpiMonthlyTable
             showIds={t2Visibility.showId}
             hidePercent={!t2Visibility.showPercent}
@@ -1646,6 +1962,7 @@ export function App() {
                 label: KPI_LABELS_T2_T3[r.id] ?? r.label,
               }))}
           />
+          <TableConsole tableId="T2" />
         </section>
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <div id="t5" data-table-id={TABLE_IDS.T5}>
@@ -1669,11 +1986,15 @@ export function App() {
               hasPercent={false}
             />
             </div>
+            <div className="mb-4 rounded-lg border border-border bg-card p-3">
+              <T5YtdChart data={t5Display} />
+            </div>
             <YtdSalesTable
               data={t5Display}
               hidePln={!t5Visibility.showPln}
               showIds={t5Visibility.showId}
             />
+            <TableConsole tableId="T5" />
           </div>
         </section>
         </div>
