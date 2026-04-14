@@ -17,6 +17,12 @@ import {
   formatPercent,
   formatQuantity,
 } from "./gopos-mapper.ts";
+import {
+  appendLog,
+  handleAdminRoute,
+  handleAuthRoute,
+  requireAuth,
+} from "./auth.ts";
 
 const TM_YEAR = 2026;
 const TM_MONTH_0 = 3; // April
@@ -105,22 +111,71 @@ async function handleT5Current(orgId: string, res: ServerResponse) {
   }
 }
 
+export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const url = new URL(req.url ?? "", "http://localhost");
+  const pathname = url.pathname;
+
+  if (pathname.startsWith("/api/auth/")) {
+    return handleAuthRoute(pathname.slice("/api/auth".length), req, res);
+  }
+
+  if (pathname.startsWith("/api/admin/")) {
+    return handleAdminRoute(pathname.slice("/api/admin".length), req, res);
+  }
+
+  if (pathname.startsWith("/api/gopos/")) {
+    const user = requireAuth(req, res);
+    if (!user) return true;
+    const sub = pathname.slice("/api/gopos".length);
+    const orgId = getOrgId(req);
+    if (!orgId) {
+      json(res, 400, { error: "missing ?org=" });
+      return true;
+    }
+    if (!knownOrg(orgId)) {
+      json(res, 404, { error: "unknown org" });
+      return true;
+    }
+    try {
+      if (sub === "/t1/current") {
+        await handleT1Current(orgId, res);
+      } else if (sub === "/t2/current") {
+        await handleT2Current(orgId, res);
+      } else if (sub === "/t5/current") {
+        await handleT5Current(orgId, res);
+      } else {
+        json(res, 404, { error: "unknown gopos route" });
+        return true;
+      }
+      appendLog({
+        type: "api",
+        actor: user.email,
+        status: res.statusCode >= 400 ? "fail" : "ok",
+        message: `${sub} org=${orgId} → ${res.statusCode}`,
+      });
+    } catch (err) {
+      appendLog({
+        type: "api",
+        actor: user.email,
+        status: "fail",
+        message: `${sub} ${(err as Error).message}`,
+      });
+      if (!res.headersSent) json(res, 500, { error: (err as Error).message });
+    }
+    return true;
+  }
+
+  return false;
+}
+
 export function goposApiPlugin(): Plugin {
   return {
     name: "gopos-api",
     configureServer(server) {
-      server.middlewares.use("/api/gopos", async (req, res, next) => {
+      server.middlewares.use(async (req, res, next) => {
         try {
-          const url = new URL(req.url ?? "", "http://localhost");
-          const path = url.pathname;
-          const orgId = getOrgId(req);
-          if (!orgId) return json(res, 400, { error: "missing ?org=" });
-          if (!knownOrg(orgId)) return json(res, 404, { error: "unknown org" });
-
-          if (path === "/t1/current") return await handleT1Current(orgId, res);
-          if (path === "/t2/current") return await handleT2Current(orgId, res);
-          if (path === "/t5/current") return await handleT5Current(orgId, res);
-          return next();
+          const handled = await handleApi(req, res);
+          if (!handled) next();
         } catch (err) {
           json(res, 500, { error: (err as Error).message });
         }

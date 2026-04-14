@@ -34,22 +34,30 @@ COPY . .
 RUN pnpm build
 
 # ──────────────────────────────────────────────
-# Stage 5 – prod: serve built assets via nginx
+# Stage 5 – prod: serve built assets + auth API via Node
 # ──────────────────────────────────────────────
-FROM nginx:1.27-alpine AS prod
-# Non-root nginx setup
+FROM base AS prod
+ENV NODE_ENV=production
+WORKDIR /app
+
+# Install only what the runtime server needs (tsx is required to run .ts directly)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod=false --ignore-scripts
+
+COPY --from=build /app/dist ./dist
+COPY server.ts ./server.ts
+COPY src/server ./src/server
+COPY src/config ./src/config
+COPY tsconfig.json tsconfig.node.json tsconfig.app.json ./
+
 RUN addgroup -g 1001 -S appgroup && \
     adduser  -u 1001 -S appuser -G appgroup && \
-    # nginx needs to write to these dirs
-    chown -R appuser:appgroup /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
-    touch /var/run/nginx.pid && \
-    chown appuser:appgroup /var/run/nginx.pid
-
-COPY --from=build --chown=appuser:appgroup /app/dist /usr/share/nginx/html
-COPY --chown=appuser:appgroup docker/nginx.conf /etc/nginx/conf.d/default.conf
+    mkdir -p /app/data && \
+    chown -R appuser:appgroup /app
 
 USER appuser
 EXPOSE 4173
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget -qO- http://localhost:4173/ || exit 1
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["pnpm", "exec", "tsx", "server.ts"]

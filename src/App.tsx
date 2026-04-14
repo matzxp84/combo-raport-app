@@ -65,6 +65,9 @@ import {
 } from "@/components/ui/tooltip";
 import { loggedFetch } from "@/lib/loggedFetch";
 import { useLogContext } from "@/contexts/useLog";
+import { useAuth } from "@/contexts/useAuth";
+import { LoginPage } from "@/components/LoginPage";
+import { AdminPanel } from "@/components/AdminPanel";
 import { TableConsole } from "@/components/TableConsole";
 import { GOPOS_ROW_SLUGS, GOPOS_T1_COL_SLUGS, GOPOS_T2_COL_SLUGS } from "@/lib/gopos-slugs";
 import { T1VolumeChart } from "@/components/charts/T1VolumeChart";
@@ -1592,7 +1595,14 @@ function mergeYtdRows(rowsArrays: YtdRow[][]): YtdRow[] {
   return Array.from(byId.values());
 }
 
-export function App() {
+function AppInner({
+  onGoAdmin,
+  showAdminNav,
+}: {
+  onGoAdmin?: () => void;
+  showAdminNav: boolean;
+}) {
+  const { user: authUser, logout } = useAuth();
   const { pushLog } = useLogContext();
   const [t1SelectedLists, setT1SelectedLists] = useState<string[]>([initialListName]);
   const [t1NameAlias, setT1NameAlias] = useState<string>(initialNameAlias);
@@ -1835,6 +1845,22 @@ export function App() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          {showAdminNav && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Administracja</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => onGoAdmin?.()}
+                    >
+                      <span>Panel admina</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
@@ -1859,17 +1885,22 @@ export function App() {
                   <UserCircle className="size-5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Gość</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  {authUser?.name ?? "Gość"}
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {authUser?.email}
+                  </div>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem disabled>
                   <User className="size-4 mr-2" /> Profil
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem disabled>
                   <Settings className="size-4 mr-2" /> Ustawienia
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => logout()}>
                   <LogOut className="size-4 mr-2" /> Wyloguj
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -2029,6 +2060,63 @@ export function App() {
     </div>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function AdminView({ onGoTables }: { onGoTables: () => void }) {
+  const { logout, user } = useAuth();
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/vite.svg" alt="Logo" className="size-8" />
+            <span className="font-semibold text-lg">Combo Raport — Admin</span>
+            <span className="text-xs text-muted-foreground ml-2">{user?.email}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onGoTables}>
+              Widok tabel
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => logout()}>
+              <LogOut className="size-4 mr-2" /> Wyloguj
+            </Button>
+          </div>
+        </div>
+      </header>
+      <AdminPanel />
+    </div>
+  );
+}
+
+export function App() {
+  const { user, loading } = useAuth();
+  const [view, setView] = useState<"tables" | "admin">("tables");
+
+  useEffect(() => {
+    if (user?.role === "admin") setView("admin");
+    else if (user) setView("tables");
+  }, [user?.id, user?.role]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Ładowanie…
+      </div>
+    );
+  }
+
+  if (!user) return <LoginPage />;
+
+  if (user.role === "admin" && view === "admin") {
+    return <AdminView onGoTables={() => setView("tables")} />;
+  }
+
+  return (
+    <AppInner
+      showAdminNav={user.role === "admin"}
+      onGoAdmin={user.role === "admin" ? () => setView("admin") : undefined}
+    />
   );
 }
 

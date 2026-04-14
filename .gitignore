@@ -52,3 +52,7 @@ desktop.ini
 
 .temp
 source
+
+# Auth / runtime data
+data/
+

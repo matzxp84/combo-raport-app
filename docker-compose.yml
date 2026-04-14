@@ -12,10 +12,12 @@ services:
       - .:/app
       # Prevent host node_modules from overriding container's
       - /app/node_modules
+      - combo_data:/app/data
     ports:
       - "5173:5173"
     environment:
       - NODE_ENV=development
+      - AUTH_DATA_PATH=/app/data/auth.json
     networks:
       - combo_net
     restart: unless-stopped
@@ -30,6 +32,12 @@ services:
     container_name: combo_prod
     ports:
       - "4173:4173"
+    volumes:
+      - combo_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=4173
+      - AUTH_DATA_PATH=/app/data/auth.json
     networks:
       - combo_net
     restart: unless-stopped
@@ -41,6 +49,10 @@ services:
       retries: 3
     profiles:
       - prod
+
+volumes:
+  combo_data:
+    name: combo_data
 
 networks:
   # Izolowana sieć – nie koliduje z sieciami spzw_backend / spzw_frontend

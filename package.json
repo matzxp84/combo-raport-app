@@ -10,6 +10,7 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
+    "start": "tsx server.ts",
     "regenerate:data": "tsx scripts/regenerate-data.ts"
   },
   "dependencies": {
