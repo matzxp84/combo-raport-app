@@ -2,36 +2,159 @@
 
 Interaktywna aplikacja raportowa do wizualizacji miesięcznych danych sprzedażowych i wolumenowych. Dane są ładowane dynamicznie z plików JSON według wybranej listy i miesiąca.
 
-## Features
+---
 
-- **Dynamiczne ładowanie danych** – dane tabel pobierane są z plików JSON (`/public/data/T{n}/T{n}L{listId}.json`) per tabela i lista; brak blokowania całego UI podczas ładowania
-- **Wybór listy i miesiąca** – selektor główny z mapowaniem nazwa→ID listy (`L1/L2/L3`), selektor miesiąca (01–12)
-- **Wielosekciowy raport** – sekcje T1, T2, T5 renderowane osobno z niezależnymi stanami ładowania; każda sekcja oznaczona atrybutem `data-table-id` dla automatyzacji
-- **TanStack Table** – headless table z dynamicznie generowanymi kolumnami na podstawie danych JSON
-- **Dark mode** – przełącznik z detekcją preferencji systemowych (`prefers-color-scheme`), persystowany przez `ThemeProvider`
-- **Podświetlanie komórek** – wsparcie dla `highlight` i `highlightBg` na poziomie danych JSON, renderowane jako wyróżnione komórki w tabeli
-- **Stabilne ID elementów DOM** – komórki, wiersze i sekcje mają deterministyczne atrybuty `data-*` (np. `data-cell-id="TYLM"`) generowane z etykiet rocznych i miesięcznych, co umożliwia integrację z systemami zewnętrznymi
-- **Checkboxy filtrowania wierszy** – możliwość ukrywania wybranych wierszy raportu bezpośrednio w UI
+## Docker – szybki start
 
-## Specyfikacja rozwiązań
+### Tryb developerski (hot-reload)
 
-### Struktura danych
+```bash
+docker compose --profile dev up
+```
 
-Każdy plik JSON to tablica wierszy `ReportRow[]`:
+Aplikacja dostępna pod: **http://localhost:5173**
+
+Pliki z hosta są montowane do kontenera — każda zmiana w `src/` lub `public/data/` odświeża przeglądarkę automatycznie.
+
+### Zatrzymanie
+
+```bash
+docker compose --profile dev down
+```
+
+### Build produkcyjny (nginx)
+
+```bash
+docker compose --profile prod up --build
+```
+
+Aplikacja dostępna pod: **http://localhost:4173**
+
+### Rebuild po zmianie zależności (package.json)
+
+```bash
+docker compose --profile dev build --no-cache
+docker compose --profile dev up
+```
+
+### Podgląd logów kontenera
+
+```bash
+docker logs combo_dev -f
+```
+
+### Wejście do shella kontenera
+
+```bash
+docker exec -it combo_dev sh
+```
+
+---
+
+## Komendy pnpm (lokalnie, bez Dockera)
+
+```bash
+pnpm dev          # serwer deweloperski
+pnpm build        # kompilacja TypeScript + Vite build
+pnpm preview      # podgląd produkcyjnego builda
+pnpm lint         # ESLint
+pnpm format       # Prettier (nadpisuje pliki)
+pnpm typecheck    # tsc --noEmit (samo sprawdzenie typów, bez buildu)
+```
+
+---
+
+## Struktura projektu
+
+```
+combo-raport-app/
+├── src/
+│   ├── App.tsx                     # główny komponent, logika wyboru listy/miesiąca
+│   ├── main.tsx                    # punkt wejścia React
+│   ├── index.css                   # globalne style + zmienne Tailwind
+│   ├── components/
+│   │   ├── theme-provider.tsx      # dark/light mode, persystencja
+│   │   └── ui/                     # komponenty shadcn/ui (button, table, checkbox…)
+│   └── lib/
+│       └── utils.ts                # cn() helper (clsx + tailwind-merge)
+├── public/
+│   └── data/
+│       ├── T1/                     # dane tabeli T1 per lista
+│       ├── T2/                     # dane tabeli T2 per lista
+│       └── T5/                     # dane tabeli T5 per lista
+├── docker/
+│   └── nginx.conf                  # konfiguracja nginx dla trybu prod
+├── Dockerfile                      # multi-stage: base → deps → dev / build → prod
+├── docker-compose.yml              # profile: dev (5173) i prod (4173)
+├── .dockerignore
+├── vite.config.ts
+├── tsconfig.json
+├── components.json                 # konfiguracja shadcn
+└── package.json
+```
+
+---
+
+## Dodawanie komponentów shadcn
+
+```bash
+npx shadcn@latest add button
+```
+
+Komponenty trafiają do `src/components/ui/`. Import:
+
+```tsx
+import { Button } from "@/components/ui/button"
+```
+
+---
+
+## Dane raportowe
+
+### Struktura pliku JSON
+
+Każdy plik to tablica `ReportRow[]`:
+
 ```json
 [{ "id": "2026", "label": "2026", "cells": [{ "value": "88 045", "highlight": true }] }]
 ```
-Nazwa pliku koduje tabelę i listę: `T1L12830.json` → tabela T1, lista L1, lokalizacja 2830.
+
+Ścieżka pliku: `public/data/T{n}/T{n}L{listId}.json`
+Przykład: `public/data/T1/T1L12830.json` → tabela T1, lista L1, lokalizacja 2830.
+
+### Listy (list_id)
+
+| Wyświetlana nazwa | list_id |
+|---|---|
+| Rafał Lubak | L1 |
+| Rafał Wieczorek | L2 |
+| Andrzej Chmielewski | L3 |
+
+### Sekcje raportu (table_id)
+
+| table_id | Sekcja |
+|---|---|
+| T1 | Informacje o wolumenie miesięcznym |
+| T2 | Kluczowe wskaźniki miesięczne |
+| T5 | Sprzedaż od początku roku |
+
+Każda sekcja w DOM ma atrybut `data-table-id="T1"` — przydatne przy automatyzacji.
 
 ### Mapowanie ID komórek (T1)
 
-Etykiety roczne są mapowane na czytelne skróty:
-- `2026` → `TY`, `2025` → `LY`, `2024` → `AY`
-- `2026 vs 2025` → `VS1`, `2025 vs 2024` → `VS2`
+| Etykieta | Alias |
+|---|---|
+| 2026 | TY |
+| 2025 | LY |
+| 2024 | AY |
+| 2026 vs 2025 | VS1 |
+| 2025 vs 2024 | VS2 |
 
-Miesięczne ID komórek dla bieżącego roku (TY) mają aliasy: `TY+02 → TYLM`, `TY+03 → TYTM`, `TY+04 → TYNM`.
+Aliasy miesięczne dla bieżącego roku: `TY+02 → TYLM`, `TY+03 → TYTM`, `TY+04 → TYNM`.
 
-### Stack technologiczny
+---
+
+## Stack technologiczny
 
 | Warstwa | Technologia |
 |---|---|
@@ -40,43 +163,20 @@ Miesięczne ID komórek dla bieżącego roku (TY) mają aliasy: `TY+02 → TYLM`
 | Ikony | Phosphor Icons, Lucide React |
 | Build | Vite 7, TypeScript 5.9 |
 | Fonty | JetBrains Mono Variable, Noto Sans Variable |
+| Kontener | Docker (multi-stage), nginx 1.27 |
 
-## Report list IDs
+---
 
-The demo report uses predefined lists of locations. Each list has a stable `list_id`:
+## Wskazówki
 
-- **L1** – `Rafał Lubak`
-- **L2** – `Rafał Wieczorek`
-- **L3** – `Andrzej Chmielewski`
+**Zmiana danych bez restartu kontenera** — edytuj pliki w `public/data/` bezpośrednio. Vite wykrywa zmiany JSON i przeładuje stronę automatycznie (skonfigurowane w `vite.config.ts` przez `vite-plugin-live-reload`).
 
-In the UI, the main list selector shows both the name and the `list_id` in parentheses (e.g. `Rafał Lubak (L1)`), and the code maps from the display name to the internal `list_id` for integration with external systems.
+**Dodanie nowej listy** — utwórz pliki JSON dla każdej tabeli (`T1`, `T2`, `T5`) z nowym `listId`, a następnie zarejestruj listę w selektorze w `App.tsx`.
 
-## Report table IDs
+**Bundle analysis** — uruchom `pnpm build`, a potem otwórz `stats.html` w katalogu głównym. Pokaże rozkład rozmiarów modułów.
 
-Each report section has a stable `table_id`:
+**Sprawdzenie typów bez buildu** — użyj `pnpm typecheck`. Szybsze niż pełny build, nie generuje plików wyjściowych.
 
-| table_id | Section | Context (title suffix) |
-|----------|---------|-------------------------|
-| **T1** | 1. Informacje o wolumenie miesięcznym | `name_alias` |
-| **T2** | 2. Kluczowe wskaźniki miesięczne | `name_alias` |
-| **T5** | 5. Sprzedaż od początku roku | `list_name` |
+**Logi live w Docker Desktop** — w zakładce Containers kliknij `combo_dev` → zakładka Logs. Alternatywnie `docker logs combo_dev -f` w terminalu.
 
-Sections are marked with `data-table-id` (e.g. `data-table-id="T1"`) for automation or analytics.
-
-## Adding components
-
-To add components to your app, run the following command:
-
-```bash
-npx shadcn@latest add button
-```
-
-This will place the ui components in the `src/components` directory.
-
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button"
-```
+**Zmiana portu dev** — edytuj `docker-compose.yml` (linia `"5173:5173"`) i `vite.config.ts` (dodaj `server: { port: XXXX }`), następnie zrób rebuild.

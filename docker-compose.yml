@@ -1,0 +1,49 @@
+name: combo-raport
+
+services:
+  # ── Development server (hot-reload) ───────────────────────────────────────
+  dev:
+    build:
+      context: .
+      target: dev
+    container_name: combo_dev
+    volumes:
+      # Live source sync – edycja pliku na hoście natychmiast widoczna w kontenerze
+      - .:/app
+      # Prevent host node_modules from overriding container's
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    networks:
+      - combo_net
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # ── Production preview (nginx) ─────────────────────────────────────────────
+  prod:
+    build:
+      context: .
+      target: prod
+    container_name: combo_prod
+    ports:
+      - "4173:4173"
+    networks:
+      - combo_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4173/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    profiles:
+      - prod
+
+networks:
+  # Izolowana sieć – nie koliduje z sieciami spzw_backend / spzw_frontend
+  combo_net:
+    name: combo_net
+    driver: bridge

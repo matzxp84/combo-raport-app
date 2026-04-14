@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+dist
+dist-ssr
+build
+stats.html
+
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Claude / agents internals
+.agents
+.claude
+.temp
+
+# Logs & cache
+*.log
+.cache
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Env files
+.env
+.env.*
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker files (no need to copy into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# pnpm workspace config is needed during build – do not ignore it
