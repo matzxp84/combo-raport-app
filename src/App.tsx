@@ -1650,8 +1650,8 @@ function AppInner({
   const [t5Data, setT5Data] = useState<YtdRow[]>(ytdSalesData);
   const [t2ApiTM, setT2ApiTM] = useState<Record<string, string>>({});
 
-  const TM_YEAR_ID = "2026";
-  const TM_MONTH_INDEX = 3; // April
+  const TM_YEAR_ID = String(new Date().getFullYear());
+  const TM_MONTH_INDEX = new Date().getMonth();
 
   function applyT1Api(value: string) {
     setT1Data((prev) =>

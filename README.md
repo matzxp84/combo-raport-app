@@ -1,34 +1,26 @@
 # combo-raport-app
 
-Interaktywna aplikacja raportowa do wizualizacji miesięcznych danych sprzedażowych i wolumenowych. Dane są ładowane dynamicznie z plików JSON według wybranej listy i miesiąca.
+Interaktywna aplikacja raportowa do wizualizacji danych sprzedażowych i wolumenowych z systemu GoPos. Dane pobierane przez API, raporty wysyłane automatycznie emailem.
 
 ---
 
-## Docker – szybki start
-
-### Tryb developerski (hot-reload)
+## Docker — szybki start
 
 ```bash
+# Dev (hot-reload)
 docker compose --profile dev up
+# http://localhost:5173
+
+# Produkcja (lokalnie)
+docker compose --profile prod up --build
+# http://localhost:4173
 ```
-
-Aplikacja dostępna pod: **http://localhost:5173**
-
-Pliki z hosta są montowane do kontenera — każda zmiana w `src/` lub `public/data/` odświeża przeglądarkę automatycznie.
 
 ### Zatrzymanie
 
 ```bash
 docker compose --profile dev down
 ```
-
-### Build produkcyjny (nginx)
-
-```bash
-docker compose --profile prod up --build
-```
-
-Aplikacja dostępna pod: **http://localhost:4173**
 
 ### Rebuild po zmianie zależności (package.json)
 
@@ -37,16 +29,79 @@ docker compose --profile dev build --no-cache
 docker compose --profile dev up
 ```
 
-### Podgląd logów kontenera
+### Podgląd logów / shell
 
 ```bash
 docker logs combo_dev -f
+docker exec -it combo_dev sh
 ```
 
-### Wejście do shella kontenera
+---
+
+## Deploy na produkcję (Mikrus)
+
+### Setup (jednorazowo)
 
 ```bash
-docker exec -it combo_dev sh
+# 1. Skonfiguruj połączenie z serwerem
+cp .deploy.env.example .deploy.env
+# Edytuj .deploy.env — ustaw host, port SSH, ścieżkę
+
+# 2. Wypchnij kod na GitHub
+git push origin main
+```
+
+### Deploy
+
+```bash
+# Pełny deploy (kod + dane: użytkownicy, config emaila, secrets)
+./scripts/deploy-prod.sh
+
+# Tylko kod (bez nadpisywania danych na serwerze)
+./scripts/deploy-prod.sh --code-only
+
+# Tylko dane (sync użytkowników/emaila z dev na prod)
+./scripts/deploy-prod.sh --data-only
+```
+
+Skrypt automatycznie:
+1. Eksportuje `auth.json` i `email.json` z lokalnego wolumenu Docker (`combo_data`)
+2. Kopiuje je na serwer przez SCP → importuje do wolumenu `combo_data_87`
+3. Kopiuje `.env` (secrets GoPos) na serwer
+4. Robi `git pull` + `docker compose --profile prod87 up -d --build`
+5. Sprawdza healthcheck kontenera
+
+### Profile Docker
+
+| Profil | Kontener | Port | Wolumin danych | Opis |
+|--------|----------|------|----------------|------|
+| `dev` | `combo_dev` | `5173` | `combo_data` | Vite hot-reload, pliki montowane z hosta |
+| `prod` | `combo_prod` | `4173` | `combo_data` | Node server, zbudowany dist/ |
+| `prod87` | `combo_prod87` | `87` | `combo_data_87` | Produkcja na Mikrusie |
+
+### Secrets
+
+| Secret | Gdzie | Ochrona |
+|--------|-------|---------|
+| GoPos API keys | `.env` | gitignore + dockerignore |
+| JWT secret | `auth.json` (Docker volume) | nie w repo |
+| Hasła użytkowników | `auth.json` (scrypt hash) | hashowane, nie w repo |
+| Hasło SMTP | `email.json` (Docker volume) | nie w repo |
+
+> `.env` i `.deploy.env` NIGDY nie trafiają do gita.
+
+---
+
+## Backup
+
+Automatyczny backup wolumenów danych na Google Drive:
+
+```bash
+# Manualny
+./scripts/backup-gdrive.sh
+
+# Cron (codziennie o 03:00)
+0 3 * * * /path/to/scripts/backup-gdrive.sh >> /var/log/combo-backup.log 2>&1
 ```
 
 ---
@@ -59,7 +114,7 @@ pnpm build        # kompilacja TypeScript + Vite build
 pnpm preview      # podgląd produkcyjnego builda
 pnpm lint         # ESLint
 pnpm format       # Prettier (nadpisuje pliki)
-pnpm typecheck    # tsc --noEmit (samo sprawdzenie typów, bez buildu)
+pnpm typecheck    # tsc --noEmit
 ```
 
 ---
@@ -69,114 +124,55 @@ pnpm typecheck    # tsc --noEmit (samo sprawdzenie typów, bez buildu)
 ```
 combo-raport-app/
 ├── src/
-│   ├── App.tsx                     # główny komponent, logika wyboru listy/miesiąca
+│   ├── App.tsx                     # główny komponent aplikacji
 │   ├── main.tsx                    # punkt wejścia React
-│   ├── index.css                   # globalne style + zmienne Tailwind
-│   ├── components/
-│   │   ├── theme-provider.tsx      # dark/light mode, persystencja
-│   │   └── ui/                     # komponenty shadcn/ui (button, table, checkbox…)
-│   └── lib/
-│       └── utils.ts                # cn() helper (clsx + tailwind-merge)
-├── public/
-│   └── data/
-│       ├── T1/                     # dane tabeli T1 per lista
-│       ├── T2/                     # dane tabeli T2 per lista
-│       └── T5/                     # dane tabeli T5 per lista
-├── docker/
-│   └── nginx.conf                  # konfiguracja nginx dla trybu prod
+│   ├── components/                 # UI: tabele, wykresy, dark mode
+│   ├── server/                     # API: auth, GoPos, email, raporty
+│   ├── config/                     # lokalizacje, listy
+│   └── lib/                        # cn() helper
+├── data/                           # runtime: auth.json, email.json (gitignored)
+├── scripts/
+│   ├── deploy-prod.sh              # deploy na serwer produkcyjny
+│   └── backup-gdrive.sh            # backup danych na Google Drive
+├── wiki/                           # dokumentacja projektu
 ├── Dockerfile                      # multi-stage: base → deps → dev / build → prod
-├── docker-compose.yml              # profile: dev (5173) i prod (4173)
-├── .dockerignore
-├── vite.config.ts
-├── tsconfig.json
-├── components.json                 # konfiguracja shadcn
-└── package.json
+├── docker-compose.yml              # profile: dev, prod, prod87
+└── .env                            # secrets GoPos (gitignored)
 ```
-
----
-
-## Dodawanie komponentów shadcn
-
-```bash
-npx shadcn@latest add button
-```
-
-Komponenty trafiają do `src/components/ui/`. Import:
-
-```tsx
-import { Button } from "@/components/ui/button"
-```
-
----
-
-## Dane raportowe
-
-### Struktura pliku JSON
-
-Każdy plik to tablica `ReportRow[]`:
-
-```json
-[{ "id": "2026", "label": "2026", "cells": [{ "value": "88 045", "highlight": true }] }]
-```
-
-Ścieżka pliku: `public/data/T{n}/T{n}L{listId}.json`
-Przykład: `public/data/T1/T1L12830.json` → tabela T1, lista L1, lokalizacja 2830.
-
-### Listy (list_id)
-
-| Wyświetlana nazwa | list_id |
-|---|---|
-| Rafał Lubak | L1 |
-| Rafał Wieczorek | L2 |
-| Andrzej Chmielewski | L3 |
-
-### Sekcje raportu (table_id)
-
-| table_id | Sekcja |
-|---|---|
-| T1 | Informacje o wolumenie miesięcznym |
-| T2 | Kluczowe wskaźniki miesięczne |
-| T5 | Sprzedaż od początku roku |
-
-Każda sekcja w DOM ma atrybut `data-table-id="T1"` — przydatne przy automatyzacji.
-
-### Mapowanie ID komórek (T1)
-
-| Etykieta | Alias |
-|---|---|
-| 2026 | TY |
-| 2025 | LY |
-| 2024 | AY |
-| 2026 vs 2025 | VS1 |
-| 2025 vs 2024 | VS2 |
-
-Aliasy miesięczne dla bieżącego roku: `TY+02 → TYLM`, `TY+03 → TYTM`, `TY+04 → TYNM`.
 
 ---
 
 ## Stack technologiczny
 
 | Warstwa | Technologia |
-|---|---|
-| UI | React 19, Tailwind CSS 4, shadcn/ui, Base UI |
-| Tabele | TanStack Table v8 |
+|---------|-------------|
+| Frontend | React 19, Tailwind CSS 4, shadcn/ui, TanStack Table v8 |
+| Backend | Node.js 22, TypeScript 5.9, Vite 7 |
+| Auth | JWT + scrypt, panel admina |
+| Email | nodemailer + email.md, harmonogramy miesięczne/tygodniowe |
+| Dane | GoPos API (OAuth2) |
 | Ikony | Phosphor Icons, Lucide React |
-| Build | Vite 7, TypeScript 5.9 |
 | Fonty | JetBrains Mono Variable, Noto Sans Variable |
-| Kontener | Docker (multi-stage), nginx 1.27 |
+| Kontener | Docker multi-stage, Node 22 Alpine |
+
+---
+
+## Dokumentacja
+
+| Strona | Opis |
+|--------|------|
+| [Docker](wiki/Docker.md) | Profile, komendy, wolumeny, sieć |
+| [Deploy](wiki/Deploy.md) | Deploy na produkcję, sync danych, secrets |
+| [Backup](wiki/Backup.md) | Backup na GDrive, rclone, disaster recovery |
+| [Struktura](wiki/Struktura-projektu.md) | Drzewo katalogów, stack, skrypty |
+| [Dane raportowe](wiki/Dane-raportowe.md) | Format JSON, listy, tabele |
+| [Komponenty](wiki/Komponenty.md) | Architektura UI, dark mode |
 
 ---
 
 ## Wskazówki
 
-**Zmiana danych bez restartu kontenera** — edytuj pliki w `public/data/` bezpośrednio. Vite wykrywa zmiany JSON i przeładuje stronę automatycznie (skonfigurowane w `vite.config.ts` przez `vite-plugin-live-reload`).
-
-**Dodanie nowej listy** — utwórz pliki JSON dla każdej tabeli (`T1`, `T2`, `T5`) z nowym `listId`, a następnie zarejestruj listę w selektorze w `App.tsx`.
-
-**Bundle analysis** — uruchom `pnpm build`, a potem otwórz `stats.html` w katalogu głównym. Pokaże rozkład rozmiarów modułów.
-
-**Sprawdzenie typów bez buildu** — użyj `pnpm typecheck`. Szybsze niż pełny build, nie generuje plików wyjściowych.
-
-**Logi live w Docker Desktop** — w zakładce Containers kliknij `combo_dev` → zakładka Logs. Alternatywnie `docker logs combo_dev -f` w terminalu.
-
-**Zmiana portu dev** — edytuj `docker-compose.yml` (linia `"5173:5173"`) i `vite.config.ts` (dodaj `server: { port: XXXX }`), następnie zrób rebuild.
+- **Zmiana danych bez restartu** — edytuj pliki w `public/data/`, Vite przeładuje automatycznie
+- **Bundle analysis** — `pnpm build` → otwórz `stats.html`
+- **Dodanie komponentu shadcn** — `npx shadcn@latest add button`
+- **Seed users** — przy pustym `auth.json` tworzone automatycznie: `matfl@tuta.com` / `pułtusk` (admin), `daniel.piekarski@t-pizza.pl` / `daniel` (user) — **zmień hasła po pierwszym deployu**

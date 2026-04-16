@@ -6,7 +6,10 @@ export type T5CurrentResponse = {
 };
 
 async function jget<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, { signal });
+  const headers: Record<string, string> = {};
+  const token = localStorage.getItem("combo-auth-token");
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(path, { signal, headers });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`${res.status}: ${body.slice(0, 200)}`);

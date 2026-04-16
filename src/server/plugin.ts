@@ -25,8 +25,9 @@ import {
 } from "./auth.ts";
 import { handleEmailRoute } from "./email.ts";
 
-const TM_YEAR = 2026;
-const TM_MONTH_0 = 3; // April
+const now = new Date();
+const TM_YEAR = now.getFullYear();
+const TM_MONTH_0 = now.getMonth();
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;

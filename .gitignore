@@ -23,6 +23,10 @@ build
 .env.production.local
 *.local
 
+# Secrets
+.deploy.env
+.api-mikrus.env
+
 # Cache
 .cache
 .parcel-cache
@@ -38,21 +42,33 @@ build
 !.vscode/extensions.json
 !.vscode/settings.json
 .idea
-.DS_Store
-Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.code-workspace
 
 # OS
 .DS_Store
+Thumbs.db
 desktop.ini
 
+# Claude Code (auto-generated)
+.claude/
+.agents/
+skills-lock.json
+
+# Build artifacts
+stats.html
 .temp
 source
 
 # Auth / runtime data
 data/
 
+# Reference input files
+/example
+
+# Wiki (separate git repo / GitHub wiki clone)
+/wiki
