@@ -4,6 +4,115 @@ Interaktywna aplikacja raportowa do wizualizacji danych sprzedażowych i wolumen
 
 ---
 
+## Schemat architektury
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  PRZEGLĄDARKA  http://localhost:5173 (dev) / :4173 (prod) / :87    │
+│                                                                      │
+│  index.html → src/main.tsx → src/App.tsx                           │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │ LoginPage    │  │ AdminPanel   │  │ Tabele + Wykresy          │  │
+│  │ (JWT login)  │  │ users / logs │  │ T1 volume / T2 KPI / T5  │  │
+│  └──────┬───────┘  │ email config │  │ YTD (Recharts)           │  │
+│         │          └──────────────┘  └──────────┬───────────────┘  │
+│         │                                        │                  │
+│    AuthContext (JWT w localStorage)    gopos-client.ts             │
+└─────────┼──────────────────────────────────────┼────────────────────┘
+          │  POST /api/auth/login                 │  GET /api/gopos/t1,t2,t5
+          ▼                                       ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  BACKEND  src/server/plugin.ts  (Vite middleware dev / Node prod)  │
+│                                                                      │
+│  /api/auth/*   ──►  auth.ts      JWT + scrypt, użytkownicy, logi  │
+│  /api/admin/*  ──►  auth.ts      CRUD users, audit log             │
+│  /api/admin/email/* ► email.ts   SMTP, harmonogram, szablony       │
+│  /api/gopos/*  ──►  gopos-api.ts fetch danych → gopos-mapper.ts   │
+│                                                                      │
+│  Dane persystowane w JSON (Docker volume combo_data):              │
+│  data/auth.json  (users, JWT secret, audit log)                    │
+│  data/email.json (SMTP config, schedule, recipients)               │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │  OAuth2 token (gopos-auth.ts)
+                               │  cache: .cache/token-cache/
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  GOPOS API  https://app.gopos.io/api/v3/reports/*                  │
+│                                                                      │
+│  /orders       → liczba transakcji, net total, avg bill            │
+│  /order_items  → pozycje (pizze, napoje, startery, dodatki)        │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  DOCKER  docker-compose.yml                                         │
+│                                                                      │
+│  profile: dev     combo_dev    :5173  Vite HMR, src/ z volume      │
+│  profile: prod    combo_prod   :4173  Node + dist/ (po build)      │
+│  profile: prod87  combo_prod87 :87    Mikrus VPS (toadres.pl)      │
+│                                                                      │
+│  Sieć: combo_net (izolowana od spzw_*)                             │
+│  Wolumeny: combo_data / combo_data_87 (auth.json, email.json)      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  SKRYPTY  scripts/                                                  │
+│                                                                      │
+│  regenerate-data.ts  → fetch GoPos dla wszystkich org              │
+│                         → public/data/T1/*.json T2/*.json T5/*.json │
+│  deploy-prod.sh      → SSH na Mikrus: git pull + docker build      │
+│  backup-gdrive.sh    → backup wolumenów na Google Drive            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Przepływ danych (request)
+
+```
+App.tsx (wybór lokalizacji)
+  └─► src/lib/api/gopos-client.ts
+        └─► GET /api/gopos/t1/current?org=2830  (Bearer JWT)
+              └─► plugin.ts: requireAuth() → JWT verify
+                    └─► gopos-api.ts: fetchOrders() + fetchOrderItems()
+                          └─► gopos-auth.ts: OAuth2 token (cache 55 min)
+                                └─► app.gopos.io/api/v3/reports/*
+                          └─► gopos-mapper.ts: agregacja kategorii
+                    └─► Response JSON → wykresy + tabela
+```
+
+### Struktura plików źródłowych
+
+```
+src/
+├── main.tsx                    # bootstrap React + providers
+├── App.tsx                     # główny layout, sidebar, tabele
+├── components/
+│   ├── LoginPage.tsx           # formularz logowania
+│   ├── AdminPanel.tsx          # panel admina
+│   ├── EmailReportSection.tsx  # config SMTP + harmonogram
+│   ├── TableConsole.tsx        # tabela z sortowaniem/paginacją
+│   ├── charts/
+│   │   ├── T1VolumeChart.tsx   # wykres przychodu miesięcznego
+│   │   ├── T2KpiChart.tsx      # KPI (avg paragon, klienci...)
+│   │   └── T5YtdChart.tsx      # breakdown kategorii YTD
+│   └── ui/                     # shadcn/ui (button, input...)
+├── contexts/
+│   ├── AuthContext.tsx         # JWT token, authFetch wrapper
+│   └── LogContext.tsx          # logowanie requestów w UI
+├── config/
+│   └── locations.json          # 30+ restauracji (org_id, nazwa, lista)
+├── lib/
+│   └── api/gopos-client.ts     # typowane funkcje fetch T1/T2/T5
+└── server/
+    ├── plugin.ts               # router API (Vite middleware + Node)
+    ├── auth.ts                 # JWT, scrypt, użytkownicy, audit log
+    ├── email.ts                # SMTP, emailmd szablony, harmonogram
+    ├── gopos-api.ts            # fetch z GoPos API v3
+    ├── gopos-auth.ts           # OAuth2 token cache
+    └── gopos-mapper.ts         # kategoryzacja: pizze/napoje/startery
+```
+
+---
+
 ## Docker — szybki start
 
 ```bash
@@ -103,6 +212,36 @@ Automatyczny backup wolumenów danych na Google Drive:
 # Cron (codziennie o 03:00)
 0 3 * * * /path/to/scripts/backup-gdrive.sh >> /var/log/combo-backup.log 2>&1
 ```
+
+---
+
+## Vite — rola w projekcie
+
+[Vite](vite.config.ts) to dev server i bundler frontendu. W tym projekcie pełni więcej funkcji niż samo serwowanie plików:
+
+| Plugin | Plik | Co robi |
+|--------|------|---------|
+| `goposApiPlugin` | [src/server/plugin.ts](src/server/plugin.ts) | własne middleware API (GoPos, auth, email) zintegrowane z Vite dev serverem |
+| `liveReload` + `watchAndRun` | [vite.config.ts](vite.config.ts#L32) | full-reload przeglądarki gdy zmienią się pliki w `public/data/` |
+| `checker` | [vite.config.ts](vite.config.ts#L22) | TypeScript + ESLint sprawdzane na bieżąco, błędy w overlay przeglądarki |
+| `tailwindcss` | — | kompilacja CSS v4 |
+| `svgr` | — | importowanie SVG jako komponentów React |
+| `tsconfigPaths` | — | aliasy `@/...` → `src/` |
+| `visualizer` | [stats.html](stats.html) | analiza bundle po `pnpm build` |
+
+### Tryby pracy
+
+| Komenda | Gdzie | Port | Vite działa? |
+|---------|-------|------|--------------|
+| `pnpm dev` | host bezpośrednio | 5173 | tak — dev server z HMR |
+| `docker compose --profile dev up` | kontener | 5173 | tak — ten sam Vite, źródła z volume |
+| `docker compose --profile prod up` | kontener | 4173 | nie — tylko zbudowany `dist/` |
+
+> **Uwaga:** nie uruchamiaj `pnpm dev` na hoście i `docker compose --profile dev` jednocześnie — oba zajmują port 5173.
+
+### Kolizja z Dockerem?
+
+Nie ma kolizji. Sieć [`combo_net`](docker-compose.yml#L88) jest izolowana od kontenerów `spzw_*`. Profile (`dev`, `prod`, `prod87`) używają różnych portów i nigdy nie startują razem.
 
 ---
 
