@@ -2094,10 +2094,9 @@ export function App() {
   const [view, setView] = useState<"tables" | "admin">("tables");
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user?.role === "admin") setView("admin");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     else if (user) setView("tables");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.role]);
 
   if (loading) {
