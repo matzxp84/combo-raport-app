@@ -519,23 +519,45 @@ function KpiMonthlyTable({
   hidePercent = false,
   hidePln = false,
   apiTM,
+  chartRows,
+  onChartRowToggle,
+  chartCols,
+  onChartColToggle,
 }: {
   data?: KpiRow[];
   showIds?: boolean;
   hidePercent?: boolean;
   hidePln?: boolean;
   apiTM?: Record<string, string>;
+  chartRows?: Set<string>;
+  onChartRowToggle?: (id: string) => void;
+  chartCols?: Set<string>;
+  onChartColToggle?: (id: string) => void;
 }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "month-0", desc: true }]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [expanded, setExpanded] = useState(false);
 
   const columns: ColumnDef<KpiRow>[] = useMemo(() => [
+    ...(chartRows && onChartRowToggle ? [{
+      id: "chart-row",
+      enableSorting: false,
+      header: () => <span className="text-xs text-muted-foreground" title="Wykres">📊</span>,
+      cell: ({ row }: { row: { original: KpiRow } }) => (
+        <input
+          type="checkbox"
+          checked={chartRows.has(row.original.id)}
+          onChange={() => onChartRowToggle(row.original.id)}
+          className="size-3.5 cursor-pointer accent-primary"
+          title="Pokaż na wykresie"
+        />
+      ),
+    } as ColumnDef<KpiRow>] : []),
     {
       accessorKey: "label",
       header: () => <span className="text-xs text-muted-foreground">Wskaźnik</span>,
       enableSorting: false,
-      cell: ({ row, getValue }) => {
+      cell: ({ row, getValue }: { row: { original: KpiRow; index: number }; getValue: () => unknown }) => {
         const labelId = showIds ? formatRowIndexId(row.index) : undefined;
         const slug = GOPOS_ROW_SLUGS[row.original.id];
         return (
@@ -566,30 +588,41 @@ function KpiMonthlyTable({
         const colId = formatKpiMonthId(col.from);
         const slug = GOPOS_T2_COL_SLUGS[colId];
         return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={column.getToggleSortingHandler()}
-                className="inline-flex flex-col items-end leading-tight whitespace-nowrap cursor-pointer select-none"
-              >
-                <span className="flex items-center">
-                  {formatKpiMonthDisplay(col.from)}
-                  <SortIndicator state={column.getIsSorted()} />
-                </span>
-                {showIds && (
-                  <span className="text-muted-foreground text-xs">ID:{colId}</span>
-                )}
-                <SlugBadge slug={slug} />
-              </button>
-            </TooltipTrigger>
-            <InfoTooltipContent>
-              <strong className="text-sm">{formatKpiMonthDisplay(col.from)}</strong>
-              <span className="text-xs">ID kolumny: <code>{colId}</code></span>
-              <span className="text-xs">Zakres: {col.from.slice(0, 10)} → {col.to.slice(0, 10)}</span>
-              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
-            </InfoTooltipContent>
-          </Tooltip>
+          <div className="inline-flex flex-col items-end gap-0.5">
+            {chartCols && onChartColToggle && (
+              <input
+                type="checkbox"
+                checked={chartCols.has(col.label)}
+                onChange={() => onChartColToggle(col.label)}
+                className="size-3 cursor-pointer accent-primary self-center"
+                title="Pokaż na wykresie"
+              />
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={column.getToggleSortingHandler()}
+                  className="inline-flex flex-col items-end leading-tight whitespace-nowrap cursor-pointer select-none"
+                >
+                  <span className="flex items-center">
+                    {formatKpiMonthDisplay(col.from)}
+                    <SortIndicator state={column.getIsSorted()} />
+                  </span>
+                  {showIds && (
+                    <span className="text-muted-foreground text-xs">ID:{colId}</span>
+                  )}
+                  <SlugBadge slug={slug} />
+                </button>
+              </TooltipTrigger>
+              <InfoTooltipContent>
+                <strong className="text-sm">{formatKpiMonthDisplay(col.from)}</strong>
+                <span className="text-xs">ID kolumny: <code>{colId}</code></span>
+                <span className="text-xs">Zakres: {col.from.slice(0, 10)} → {col.to.slice(0, 10)}</span>
+                {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+              </InfoTooltipContent>
+            </Tooltip>
+          </div>
         );
       },
       cell: ({ row }: { row: { original: KpiRow; index: number } }) => {
@@ -636,7 +669,7 @@ function KpiMonthlyTable({
         );
       },
     })),
-  ], [showIds, hidePercent, hidePln, apiTM]);
+  ], [showIds, hidePercent, hidePln, apiTM, chartRows, chartCols, onChartRowToggle, onChartColToggle]);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns non-memoizable functions by design
   const table = useReactTable({
@@ -778,12 +811,30 @@ function YtdSalesTable({
   data = ytdSalesData,
   hidePln = false,
   showIds = false,
+  chartRows,
+  onChartRowToggle,
 }: {
   data?: YtdRow[];
   hidePln?: boolean;
   showIds?: boolean;
+  chartRows?: Set<string>;
+  onChartRowToggle?: (id: string) => void;
 }) {
-  const columns: ColumnDef<YtdRow>[] = [
+  const columns: ColumnDef<YtdRow>[] = useMemo(() => [
+    ...(chartRows && onChartRowToggle ? [{
+      id: "chart-row",
+      enableSorting: false,
+      header: () => <span className="text-xs text-muted-foreground" title="Wykres">📊</span>,
+      cell: ({ row }: { row: { original: YtdRow } }) => (
+        <input
+          type="checkbox"
+          checked={chartRows.has(row.original.id)}
+          onChange={() => onChartRowToggle(row.original.id)}
+          className="size-3.5 cursor-pointer accent-primary"
+          title="Pokaż na wykresie"
+        />
+      ),
+    } as ColumnDef<YtdRow>] : []),
     {
       accessorKey: "category",
       header: () => (
@@ -827,7 +878,7 @@ function YtdSalesTable({
         );
       },
     },
-  ];
+  ], [showIds, hidePln, chartRows, onChartRowToggle]);
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns non-memoizable functions by design
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
   return (
@@ -899,21 +950,43 @@ function ReportTable({
   data = reportData,
   showIds = true,
   hidePercent = false,
+  chartRows,
+  onChartRowToggle,
+  chartCols,
+  onChartColToggle,
 }: {
   data?: ReportRow[];
   showIds?: boolean;
   hidePercent?: boolean;
+  chartRows?: Set<string>;
+  onChartRowToggle?: (id: string) => void;
+  chartCols?: Set<string>;
+  onChartColToggle?: (id: string) => void;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [expanded, setExpanded] = useState(false);
 
   const columns: ColumnDef<ReportRow>[] = useMemo(() => [
+    ...(chartRows && onChartRowToggle ? [{
+      id: "chart-row",
+      enableSorting: false,
+      header: () => <span className="text-xs text-muted-foreground" title="Wykres">📊</span>,
+      cell: ({ row }: { row: { original: ReportRow } }) => (
+        <input
+          type="checkbox"
+          checked={chartRows.has(row.original.id)}
+          onChange={() => onChartRowToggle(row.original.id)}
+          className="size-3.5 cursor-pointer accent-primary"
+          title="Pokaż na wykresie"
+        />
+      ),
+    } as ColumnDef<ReportRow>] : []),
     {
       accessorKey: "label",
       header: () => <span className="text-xs text-muted-foreground">Wiersz</span>,
       enableSorting: false,
-      cell: ({ getValue, row }) => {
+      cell: ({ getValue, row }: { getValue: () => unknown; row: { original: ReportRow } }) => {
         const label = getValue() as string;
         const displayId = getDisplayRowId(label, row.original.id);
         const slug = GOPOS_ROW_SLUGS[row.original.id];
@@ -948,29 +1021,40 @@ function ReportTable({
       header: ({ column }: { column: { getToggleSortingHandler: () => ((e: unknown) => void) | undefined; getIsSorted: () => false | "asc" | "desc" } }) => {
         const slug = GOPOS_T1_COL_SLUGS[month.id];
         return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={column.getToggleSortingHandler()}
-                className="inline-flex flex-col items-end leading-tight cursor-pointer select-none"
-              >
-                <span className="flex items-center">
-                  {month.label}
-                  <SortIndicator state={column.getIsSorted()} />
-                </span>
-                {showIds && (
-                  <span className="text-muted-foreground text-xs">ID:{month.id}</span>
-                )}
-                <SlugBadge slug={slug} />
-              </button>
-            </TooltipTrigger>
-            <InfoTooltipContent>
-              <strong className="text-sm">{month.label}</strong>
-              <span className="text-xs">ID kolumny: <code>{month.id}</code></span>
-              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
-            </InfoTooltipContent>
-          </Tooltip>
+          <div className="inline-flex flex-col items-end gap-0.5">
+            {chartCols && onChartColToggle && (
+              <input
+                type="checkbox"
+                checked={chartCols.has(month.id)}
+                onChange={() => onChartColToggle(month.id)}
+                className="size-3 cursor-pointer accent-primary self-center"
+                title="Pokaż na wykresie"
+              />
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={column.getToggleSortingHandler()}
+                  className="inline-flex flex-col items-end leading-tight cursor-pointer select-none"
+                >
+                  <span className="flex items-center">
+                    {month.label}
+                    <SortIndicator state={column.getIsSorted()} />
+                  </span>
+                  {showIds && (
+                    <span className="text-muted-foreground text-xs">ID:{month.id}</span>
+                  )}
+                  <SlugBadge slug={slug} />
+                </button>
+              </TooltipTrigger>
+              <InfoTooltipContent>
+                <strong className="text-sm">{month.label}</strong>
+                <span className="text-xs">ID kolumny: <code>{month.id}</code></span>
+                {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+              </InfoTooltipContent>
+            </Tooltip>
+          </div>
         );
       },
       cell: ({ row }: { row: { original: ReportRow } }) => {
@@ -1006,8 +1090,8 @@ function ReportTable({
     {
       id: "suma",
       accessorFn: (row: ReportRow) => row.cells[12]?.value ?? "-",
-      sortingFn: (a, b) => parseNumericForSort(a.original.cells[12]?.value ?? "") - parseNumericForSort(b.original.cells[12]?.value ?? ""),
-      header: ({ column }) => (
+      sortingFn: (a: { original: ReportRow }, b: { original: ReportRow }) => parseNumericForSort(a.original.cells[12]?.value ?? "") - parseNumericForSort(b.original.cells[12]?.value ?? ""),
+      header: ({ column }: { column: { getToggleSortingHandler: () => ((e: unknown) => void) | undefined; getIsSorted: () => false | "asc" | "desc" } }) => (
         <button
           type="button"
           onClick={column.getToggleSortingHandler()}
@@ -1021,7 +1105,7 @@ function ReportTable({
           <SlugBadge slug={GOPOS_T1_COL_SLUGS.suma} />
         </button>
       ),
-      cell: ({ row }) => (
+      cell: ({ row }: { row: { original: ReportRow } }) => (
         <span className="inline-flex flex-col items-end leading-tight">
           <CellContent cell={row.original.cells[12]} hidePercent={hidePercent} />
           {showIds && (
@@ -1035,8 +1119,8 @@ function ReportTable({
     {
       id: "srednia",
       accessorFn: (row: ReportRow) => row.cells[13]?.value ?? "-",
-      sortingFn: (a, b) => parseNumericForSort(a.original.cells[13]?.value ?? "") - parseNumericForSort(b.original.cells[13]?.value ?? ""),
-      header: ({ column }) => (
+      sortingFn: (a: { original: ReportRow }, b: { original: ReportRow }) => parseNumericForSort(a.original.cells[13]?.value ?? "") - parseNumericForSort(b.original.cells[13]?.value ?? ""),
+      header: ({ column }: { column: { getToggleSortingHandler: () => ((e: unknown) => void) | undefined; getIsSorted: () => false | "asc" | "desc" } }) => (
         <button
           type="button"
           onClick={column.getToggleSortingHandler()}
@@ -1050,7 +1134,7 @@ function ReportTable({
           <SlugBadge slug={GOPOS_T1_COL_SLUGS.srednia} />
         </button>
       ),
-      cell: ({ row }) => (
+      cell: ({ row }: { row: { original: ReportRow } }) => (
         <span className="inline-flex flex-col items-end leading-tight">
           <CellContent cell={row.original.cells[13]} hidePercent={hidePercent} />
           {showIds && (
@@ -1061,7 +1145,7 @@ function ReportTable({
         </span>
       ),
     },
-  ], [showIds, hidePercent]);
+  ], [showIds, hidePercent, chartRows, chartCols, onChartRowToggle, onChartColToggle]);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns non-memoizable functions by design
   const table = useReactTable({
@@ -1516,64 +1600,6 @@ type TableVisibility = {
   showPln: boolean;
 };
 
-function ChartSelector({
-  label,
-  items,
-  selected,
-  onChange,
-}: {
-  label: string;
-  items: { id: string; label: string }[];
-  selected: Set<string>;
-  onChange: (next: Set<string>) => void;
-}) {
-  const allSelected = items.every((i) => selected.has(i.id));
-  const toggle = (id: string) => {
-    const next = new Set(selected);
-    if (next.has(id)) {
-      if (next.size === 1) return;
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    onChange(next);
-  };
-  const toggleAll = () => {
-    if (allSelected) {
-      onChange(new Set([items[0].id]));
-    } else {
-      onChange(new Set(items.map((i) => i.id)));
-    }
-  };
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
-        <button onClick={toggleAll} className="text-xs text-primary hover:underline">
-          {allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie"}
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map((item) => {
-          const active = selected.has(item.id);
-          return (
-            <button
-              key={item.id}
-              onClick={() => toggle(item.id)}
-              className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
-                active
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function TableVisibilityToggles({
   visibility,
@@ -1770,6 +1796,15 @@ function AppInner({
   const [t2ChartRows, setT2ChartRows] = useState<Set<string>>(new Set(T2_ROW_ORDER));
   const [t2ChartCols, setT2ChartCols] = useState<Set<string>>(new Set(T2_COL_IDS));
   const [t5ChartRows, setT5ChartRows] = useState<Set<string>>(new Set(T5_ROW_IDS));
+
+  function toggleChartSet(setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) { if (next.size > 1) next.delete(id); }
+      else next.add(id);
+      return next;
+    });
+  }
 
   const t1OrgId = t1Locations[0]?.organizationId;
   const t2OrgId = t2Locations[0]?.organizationId;
@@ -2033,20 +2068,6 @@ function AppInner({
               hasPln={false}
             />
           </div>
-          <div className="mb-3 rounded-lg border border-border bg-muted/30 p-3 flex flex-col gap-3">
-            <ChartSelector
-              label="Wiersze (lata)"
-              items={T1_ROW_IDS.map((id) => ({ id, label: id }))}
-              selected={t1ChartRows}
-              onChange={setT1ChartRows}
-            />
-            <ChartSelector
-              label="Kolumny (miesiące)"
-              items={MONTHS.map((m) => ({ id: m.id, label: m.label.slice(0, 3) }))}
-              selected={t1ChartCols}
-              onChange={setT1ChartCols}
-            />
-          </div>
           <div className="mb-4 rounded-lg border border-border bg-card p-3">
             <T1VolumeChart data={t1ChartData} monthLabels={t1ChartMonthLabels} />
           </div>
@@ -2054,6 +2075,10 @@ function AppInner({
             data={t1Display}
             showIds={t1Visibility.showId}
             hidePercent={!t1Visibility.showPercent}
+            chartRows={t1ChartRows}
+            onChartRowToggle={(id) => toggleChartSet(setT1ChartRows, id)}
+            chartCols={t1ChartCols}
+            onChartColToggle={(id) => toggleChartSet(setT1ChartCols, id)}
           />
           <TableConsole tableId="T1" />
         </section>
@@ -2076,20 +2101,6 @@ function AppInner({
               onVisibilityChange={setT2Visibility}
             />
           </div>
-          <div className="mb-3 rounded-lg border border-border bg-muted/30 p-3 flex flex-col gap-3">
-            <ChartSelector
-              label="Wiersze (wskaźniki)"
-              items={T2_ROW_ORDER.map((id) => ({ id, label: KPI_LABELS_T2_T3[id] ?? id }))}
-              selected={t2ChartRows}
-              onChange={setT2ChartRows}
-            />
-            <ChartSelector
-              label="Kolumny (miesiące)"
-              items={KPI_MONTH_COLUMNS.map((c) => ({ id: c.label, label: c.label }))}
-              selected={t2ChartCols}
-              onChange={setT2ChartCols}
-            />
-          </div>
           <div className="mb-4 rounded-lg border border-border bg-card p-3">
             <T2KpiChart data={t2ChartData} monthLabels={t2ChartMonthLabels} />
           </div>
@@ -2098,6 +2109,10 @@ function AppInner({
             hidePercent={!t2Visibility.showPercent}
             hidePln={!t2Visibility.showPln}
             apiTM={t2ApiTM}
+            chartRows={t2ChartRows}
+            onChartRowToggle={(id) => toggleChartSet(setT2ChartRows, id)}
+            chartCols={t2ChartCols}
+            onChartColToggle={(id) => toggleChartSet(setT2ChartCols, id)}
             data={t2Display
               .filter((r) => T2_ALLOWED_ROW_IDS.has(r.id))
               .sort(
@@ -2129,14 +2144,6 @@ function AppInner({
               hasPercent={false}
             />
             </div>
-            <div className="mb-3 rounded-lg border border-border bg-muted/30 p-3">
-              <ChartSelector
-                label="Kategorie"
-                items={T5_ROW_IDS.map((id) => ({ id, label: ytdSalesData.find((r) => r.id === id)?.category ?? id }))}
-                selected={t5ChartRows}
-                onChange={setT5ChartRows}
-              />
-            </div>
             <div className="mb-4 rounded-lg border border-border bg-card p-3">
               <T5YtdChart data={t5ChartData} />
             </div>
@@ -2144,6 +2151,8 @@ function AppInner({
               data={t5Display}
               hidePln={!t5Visibility.showPln}
               showIds={t5Visibility.showId}
+              chartRows={t5ChartRows}
+              onChartRowToggle={(id) => toggleChartSet(setT5ChartRows, id)}
             />
             <TableConsole tableId="T5" />
           </div>
