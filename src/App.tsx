@@ -1922,7 +1922,7 @@ function AppInner({
       </header>
       <main className="flex-1">
         <div className="w-full px-[5%] py-10 flex flex-col gap-8">
-        <section id="t1" data-table-id={TABLE_IDS.T1}>
+        <section id="t1" data-table-id={TABLE_IDS.T1} className="rounded-2xl border border-border bg-card px-6 py-6 shadow-sm">
           <h1 className="text-xl font-semibold mb-1">
             Informacje o wolumenie miesięcznym (T1)
           </h1>
@@ -1950,7 +1950,7 @@ function AppInner({
           />
           <TableConsole tableId="T1" />
         </section>
-        <section id="t2" data-table-id={TABLE_IDS.T2}>
+        <section id="t2" data-table-id={TABLE_IDS.T2} className="rounded-2xl border border-border bg-card px-6 py-6 shadow-sm">
           <h2 className="text-xl font-semibold mb-1">
             Kluczowe wskaźniki miesięczne (T2)
           </h2>
@@ -1997,7 +1997,7 @@ function AppInner({
           />
           <TableConsole tableId="T2" />
         </section>
-        <section id="t5" data-table-id={TABLE_IDS.T5}>
+        <section id="t5" data-table-id={TABLE_IDS.T5} className="rounded-2xl border border-border bg-card px-6 py-6 shadow-sm">
           <div>
             <h2 className="text-xl font-semibold mb-1">
               Sprzedaż od początku tego roku (T5)
