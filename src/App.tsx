@@ -1350,11 +1350,11 @@ const LIST_LABEL: Record<string, string> = {
 };
 
 function LocationPicker({
-  value,
+  values,
   onChange,
 }: {
-  value: SelectedLocation;
-  onChange: (loc: SelectedLocation) => void;
+  values: SelectedLocation[];
+  onChange: (locs: SelectedLocation[]) => void;
 }) {
   const [query, setQuery] = useState("");
 
@@ -1362,9 +1362,7 @@ function LocationPicker({
     const q = query.trim().toLowerCase();
     if (!q) return ALL_LOCATIONS;
     return ALL_LOCATIONS.filter(
-      (l) =>
-        l.nameAlias.toLowerCase().includes(q) ||
-        l.organizationId.includes(q)
+      (l) => l.nameAlias.toLowerCase().includes(q) || l.organizationId.includes(q)
     );
   }, [query]);
 
@@ -1377,41 +1375,53 @@ function LocationPicker({
     return map;
   }, [filtered]);
 
-  const select = useCallback(
+  const toggle = useCallback(
     (loc: typeof ALL_LOCATIONS[0]) => {
-      onChange({ nameAlias: loc.nameAlias, organizationId: loc.organizationId, listName: loc.listName });
+      const key = `${loc.listName}|${loc.organizationId}`;
+      const isSelected = values.some((v) => `${v.listName}|${v.organizationId}` === key);
+      if (isSelected) {
+        const next = values.filter((v) => `${v.listName}|${v.organizationId}` !== key);
+        onChange(next.length > 0 ? next : [{ nameAlias: loc.nameAlias, organizationId: loc.organizationId, listName: loc.listName }]);
+      } else {
+        onChange([...values, { nameAlias: loc.nameAlias, organizationId: loc.organizationId, listName: loc.listName }]);
+      }
     },
-    [onChange]
+    [values, onChange]
   );
 
   return (
     <div className="w-full rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <input
           type="text"
           placeholder="Szukaj po nazwie lub ID organizacji…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-9 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          className="h-9 flex-1 min-w-48 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
         {query && (
-          <button
-            onClick={() => setQuery("")}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <button onClick={() => setQuery("")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
             Wyczyść
           </button>
         )}
-        <span className="shrink-0 text-sm text-muted-foreground">
-          Wybrany:
-          <span className="ml-1.5 inline-flex items-center gap-1 font-medium text-foreground">
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
-              {LIST_LABEL[value.listName] ?? "?"}
-            </span>
-            {value.nameAlias}
-            <span className="text-muted-foreground font-normal">#{value.organizationId}</span>
-          </span>
-        </span>
+        {values.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground">Wybrane ({values.length}):</span>
+            {values.map((v) => (
+              <span
+                key={`${v.listName}|${v.organizationId}`}
+                className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+              >
+                <span className="opacity-60">{LIST_LABEL[v.listName] ?? "?"}</span>
+                {v.nameAlias}
+                <button
+                  onClick={() => toggle({ ...v })}
+                  className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                >×</button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {byList.size === 0 && (
@@ -1428,22 +1438,20 @@ function LocationPicker({
             </p>
             <div className="flex flex-wrap gap-2">
               {locs.map((loc) => {
-                const isActive =
-                  loc.organizationId === value.organizationId &&
-                  loc.listName === value.listName;
+                const isActive = values.some(
+                  (v) => v.organizationId === loc.organizationId && v.listName === loc.listName
+                );
                 return (
                   <button
                     key={`${loc.listName}-${loc.organizationId}`}
-                    onClick={() => select(loc)}
+                    onClick={() => toggle(loc)}
                     className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                       isActive
                         ? "border-primary bg-primary/10 text-primary font-medium"
                         : "border-border bg-background hover:bg-accent hover:text-accent-foreground"
                     }`}
                   >
-                    <span
-                      className={`size-2 rounded-full shrink-0 ${isActive ? "bg-primary" : "bg-muted-foreground/40"}`}
-                    />
+                    <span className={`size-2 rounded-sm shrink-0 border ${isActive ? "bg-primary border-primary" : "border-muted-foreground/40"}`} />
                     {loc.nameAlias}
                     <span className="text-xs text-muted-foreground">#{loc.organizationId}</span>
                   </button>
@@ -1544,6 +1552,76 @@ function ensureT1RowsComplete(
 }
 
 
+function parsePolishNumber(s: string): number | null {
+  const cleaned = s.replace(/\s/g, "").replace(",", ".");
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+function formatPolishNumber(n: number): string {
+  const [int, dec] = n.toFixed(2).split(".");
+  const spaced = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return dec === "00" ? spaced : `${spaced},${dec}`;
+}
+function mergeReportRows(rowsArrays: ReportRow[][]): ReportRow[] {
+  const byId = new Map<string, ReportRow>();
+  for (const rows of rowsArrays) {
+    for (const row of rows) {
+      const existing = byId.get(row.id);
+      if (!existing) { byId.set(row.id, { ...row, cells: row.cells.map((c) => ({ ...c })) }); continue; }
+      const merged: CellValue[] = existing.cells.map((ec, i) => {
+        const c = row.cells[i];
+        if (!c) return ec;
+        const n1 = parsePolishNumber(ec.value), n2 = parsePolishNumber(c.value);
+        if (n1 != null && n2 != null) return { value: formatPolishNumber(n1 + n2), highlight: ec.highlight };
+        if (ec.value.endsWith("%") && c.value.endsWith("%")) {
+          const p1 = parsePolishNumber(ec.value), p2 = parsePolishNumber(c.value);
+          if (p1 != null && p2 != null) return { value: formatPolishNumber((p1 + p2) / 2) + "%", highlight: ec.highlight };
+        }
+        return ec;
+      });
+      byId.set(row.id, { ...existing, cells: merged });
+    }
+  }
+  const order = ["2026","2026vs2025","2025","2025vs2024","2024","2024vs2023","2023","2023vs2022","2022"];
+  return Array.from(byId.values()).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id) || a.id.localeCompare(b.id));
+}
+function mergeKpiRows(rowsArrays: KpiRow[][]): KpiRow[] {
+  const byId = new Map<string, KpiRow>();
+  for (const rows of rowsArrays) {
+    for (const row of rows) {
+      if (!T2_ALLOWED_ROW_IDS.has(row.id)) continue;
+      const existing = byId.get(row.id);
+      if (!existing) { byId.set(row.id, { ...row, cells: [...row.cells] }); continue; }
+      const merged = existing.cells.map((ev, i) => {
+        const v = row.cells[i];
+        if (v === "-" || v === undefined) return ev;
+        const n1 = parsePolishNumber(ev), n2 = parsePolishNumber(v);
+        if (n1 != null && n2 != null) return formatPolishNumber(n1 + n2);
+        return ev;
+      });
+      byId.set(row.id, { ...existing, cells: merged });
+    }
+  }
+  return Array.from(byId.values());
+}
+function mergeYtdRows(rowsArrays: YtdRow[][]): YtdRow[] {
+  const byId = new Map<string, YtdRow>();
+  const hasZloty = (ytd: string) => ytd.includes(" zł");
+  for (const rows of rowsArrays) {
+    for (const row of rows) {
+      const existing = byId.get(row.id);
+      if (!existing) { byId.set(row.id, { ...row }); continue; }
+      const raw1 = existing.ytd.replace(/\s*zł\s*$/, ""), raw2 = row.ytd.replace(/\s*zł\s*$/, "");
+      const n1 = parsePolishNumber(raw1), n2 = parsePolishNumber(raw2);
+      if (n1 != null && n2 != null) {
+        const suffix = hasZloty(existing.ytd) || hasZloty(row.ytd) ? " zł" : "";
+        byId.set(row.id, { ...existing, ytd: `${formatPolishNumber(n1 + n2)}${suffix}` });
+      }
+    }
+  }
+  return Array.from(byId.values());
+}
+
 function AppInner({
   onGoAdmin,
   showAdminNav,
@@ -1558,9 +1636,9 @@ function AppInner({
     nameAlias: initialNameAlias,
     organizationId: LIST_NAME_TO_ALIASES[initialListName]?.[0]?.organizationId ?? "",
   };
-  const [t1Location, setT1Location] = useState<SelectedLocation>(defaultLocation);
-  const [t2Location, setT2Location] = useState<SelectedLocation>(defaultLocation);
-  const [t5Location, setT5Location] = useState<SelectedLocation>(defaultLocation);
+  const [t1Locations, setT1Locations] = useState<SelectedLocation[]>([defaultLocation]);
+  const [t2Locations, setT2Locations] = useState<SelectedLocation[]>([defaultLocation]);
+  const [t5Locations, setT5Locations] = useState<SelectedLocation[]>([defaultLocation]);
   const [t1Visibility, setT1Visibility] = useState<TableVisibility>({
     showId: false,
     showPercent: true,
@@ -1577,9 +1655,9 @@ function AppInner({
     showPln: true,
   });
 
-  const t1OrgId = t1Location.organizationId;
-  const t2OrgId = t2Location.organizationId;
-  const t5OrgId = t5Location.organizationId;
+  const t1OrgId = t1Locations[0]?.organizationId;
+  const t2OrgId = t2Locations[0]?.organizationId;
+  const t5OrgId = t5Locations[0]?.organizationId;
   const [t1Data, setT1Data] = useState<ReportRow[]>(reportData);
   const [t2Data, setT2Data] = useState<KpiRow[]>(kpiMonthlyData);
   const [t5Data, setT5Data] = useState<YtdRow[]>(ytdSalesData);
@@ -1621,50 +1699,62 @@ function AppInner({
 
   useEffect(() => {
     let cancelled = false;
-    if (!t1OrgId) return;
-    const listId = LIST_ID_BY_NAME[t1Location.listName] ?? "L1";
+    if (t1Locations.length === 0) return;
     const load = async () => {
       setDataError((e) => ({ ...e, t1: false }));
-      const res = await loggedFetch(`${T1_DATA_BASE}/T1${listId}${t1OrgId}.json`, { tableId: "T1", sink: pushLog });
-      const r = res && res.ok ? await res.json() : null;
-      if (!cancelled && Array.isArray(r)) setT1Data(r);
+      const results: ReportRow[][] = [];
+      for (const loc of t1Locations) {
+        const listId = LIST_ID_BY_NAME[loc.listName] ?? "L1";
+        const res = await loggedFetch(`${T1_DATA_BASE}/T1${listId}${loc.organizationId}.json`, { tableId: "T1", sink: pushLog });
+        const r = res && res.ok ? await res.json() : null;
+        if (Array.isArray(r)) results.push(r);
+      }
+      if (!cancelled && results.length > 0) setT1Data(results.length === 1 ? results[0] : mergeReportRows(results));
       else if (!cancelled) setDataError((e) => ({ ...e, t1: true }));
     };
     load();
     return () => { cancelled = true; };
-  }, [t1Location, t1OrgId, pushLog]);
+  }, [t1Locations, pushLog]);
 
   useEffect(() => {
     let cancelled = false;
-    if (!t2OrgId) return;
-    const listId = LIST_ID_BY_NAME[t2Location.listName] ?? "L1";
+    if (t2Locations.length === 0) return;
     const load = async () => {
       setT2ApiTM({});
       setDataError((e) => ({ ...e, t2: false }));
-      const res = await loggedFetch(`${T2_DATA_BASE}/T2${listId}${t2OrgId}.json`, { tableId: "T2", sink: pushLog });
-      const r = res && res.ok ? await res.json() : null;
-      if (!cancelled && Array.isArray(r))
-        setT2Data(r.filter((row) => T2_ALLOWED_ROW_IDS.has(row.id)));
+      const results: KpiRow[][] = [];
+      for (const loc of t2Locations) {
+        const listId = LIST_ID_BY_NAME[loc.listName] ?? "L1";
+        const res = await loggedFetch(`${T2_DATA_BASE}/T2${listId}${loc.organizationId}.json`, { tableId: "T2", sink: pushLog });
+        const r = res && res.ok ? await res.json() : null;
+        if (Array.isArray(r)) results.push(r);
+      }
+      if (!cancelled && results.length > 0)
+        setT2Data((results.length === 1 ? results[0] : mergeKpiRows(results)).filter((row) => T2_ALLOWED_ROW_IDS.has(row.id)));
       else if (!cancelled) setDataError((e) => ({ ...e, t2: true }));
     };
     load();
     return () => { cancelled = true; };
-  }, [t2Location, t2OrgId, pushLog]);
+  }, [t2Locations, pushLog]);
 
   useEffect(() => {
     let cancelled = false;
-    if (!t5OrgId) return;
-    const listId = LIST_ID_BY_NAME[t5Location.listName] ?? "L1";
+    if (t5Locations.length === 0) return;
     const load = async () => {
       setDataError((e) => ({ ...e, t5: false }));
-      const res = await loggedFetch(`${DATA_BASE}/T5${listId}${t5OrgId}.json`, { tableId: "T5", sink: pushLog });
-      const r = res && res.ok ? await res.json() : null;
-      if (!cancelled && Array.isArray(r)) setT5Data(r);
+      const results: YtdRow[][] = [];
+      for (const loc of t5Locations) {
+        const listId = LIST_ID_BY_NAME[loc.listName] ?? "L1";
+        const res = await loggedFetch(`${DATA_BASE}/T5${listId}${loc.organizationId}.json`, { tableId: "T5", sink: pushLog });
+        const r = res && res.ok ? await res.json() : null;
+        if (Array.isArray(r)) results.push(r);
+      }
+      if (!cancelled && results.length > 0) setT5Data(results.length === 1 ? results[0] : mergeYtdRows(results));
       else if (!cancelled) setDataError((e) => ({ ...e, t5: true }));
     };
     load();
     return () => { cancelled = true; };
-  }, [t5Location, t5OrgId, pushLog]);
+  }, [t5Locations, pushLog]);
 
   function scrollToTop() {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1795,7 +1885,7 @@ function AppInner({
             Zestawienie miesięczne „net_total_money”: „Wartość sprzedaży netto”, z ostatnich 2 lat.
           </p>
           <div className="mb-4">
-            <LocationPicker value={t1Location} onChange={setT1Location} />
+            <LocationPicker values={t1Locations} onChange={setT1Locations} />
           </div>
           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <FetchButton table="t1" orgId={t1OrgId} onT1Result={applyT1Api} />
@@ -1820,7 +1910,7 @@ function AppInner({
             Kluczowe wskaźniki miesięczne (T2)
           </h2>
           <div className="mb-4">
-            <LocationPicker value={t2Location} onChange={setT2Location} />
+            <LocationPicker values={t2Locations} onChange={setT2Locations} />
           </div>
           {dataError.t2 && (
             <p className="mb-2 text-sm text-destructive">
@@ -1868,7 +1958,7 @@ function AppInner({
               Sprzedaż od początku tego roku (T5)
             </h2>
             <div className="mb-4">
-              <LocationPicker value={t5Location} onChange={setT5Location} />
+              <LocationPicker values={t5Locations} onChange={setT5Locations} />
             </div>
             <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <FetchButton table="t5" orgId={t5OrgId} onT5Result={applyT5Api} />
