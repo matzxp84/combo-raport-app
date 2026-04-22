@@ -1356,7 +1356,7 @@ function LocationPicker({
   values: SelectedLocation[];
   onChange: (locs: SelectedLocation[]) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<false | "browse" | "search">(false);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -1395,10 +1395,16 @@ function LocationPicker({
       {/* always-visible summary bar */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
-          onClick={() => setOpen((o) => !o)}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+          onClick={() => setMode((m) => m === "browse" ? false : "browse")}
+          className={`shrink-0 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "browse" ? "border-primary bg-primary text-primary-foreground" : "border-primary bg-primary/10 text-primary hover:bg-primary/20"}`}
         >
-          {open ? "▲ ZWIŃ" : "▼ WYBIERZ"}
+          {mode === "browse" ? "▲ ZWIŃ" : "▼ WYBIERZ LOKAL"}
+        </button>
+        <button
+          onClick={() => { setMode((m) => m === "search" ? false : "search"); setQuery(""); }}
+          className={`shrink-0 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "search" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+        >
+          🔍 WYSZUKAJ LOKAL
         </button>
         <span className="text-xs text-muted-foreground shrink-0">Wybrane ({values.length}):</span>
         {values.map((v) => (
@@ -1417,24 +1423,27 @@ function LocationPicker({
       </div>
 
       {/* collapsible panel */}
-      {open && (
+      {mode && (
         <div className="flex flex-col gap-3 pt-2 border-t border-border">
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Szukaj po nazwie lub ID organizacji…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="h-9 flex-1 min-w-48 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
-            {query && (
-              <button onClick={() => setQuery("")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                Wyczyść
-              </button>
-            )}
-          </div>
+          {mode === "search" && (
+            <div className="flex items-center gap-3">
+              <input
+                autoFocus
+                type="text"
+                placeholder="Szukaj po nazwie lub ID organizacji…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="h-9 flex-1 min-w-48 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+              {query && (
+                <button onClick={() => setQuery("")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Wyczyść
+                </button>
+              )}
+            </div>
+          )}
 
-          {byList.size === 0 && (
+          {mode === "search" && byList.size === 0 && (
             <p className="text-sm text-muted-foreground py-1">Brak wyników dla „{query}"</p>
           )}
 
