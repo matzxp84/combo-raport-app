@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -1333,76 +1333,133 @@ const T2_DATA_BASE = "/data/T2";
 const initialListName = LIST_OPTIONS[0].name;
 const initialNameAlias = LIST_NAME_TO_ALIASES[initialListName]?.[0]?.nameAlias ?? "";
 
-function ListLocationMultiSelect({
-  selectedListNames,
-  setSelectedListNames,
-  nameAlias,
-  setNameAlias,
-}: {
-  selectedListNames: string[];
-  setSelectedListNames: (v: string[]) => void;
+type SelectedLocation = {
   nameAlias: string;
-  setNameAlias: (v: string) => void;
-}) {
-  const isSingleList = selectedListNames.length === 1;
-  const currentListName = isSingleList ? selectedListNames[0] : "";
-  const currentAliases = LIST_NAME_TO_ALIASES[currentListName] ?? [];
+  organizationId: string;
+  listName: string;
+};
 
-  const toggleList = (listName: string) => {
-    const isCurrentlySelected = selectedListNames.includes(listName);
-    const next = isCurrentlySelected
-      ? selectedListNames.filter((n) => n !== listName)
-      : [...selectedListNames, listName];
-    setSelectedListNames(next);
-    if (next.length === 1) {
-      const aliases = LIST_NAME_TO_ALIASES[next[0]] ?? [];
-      setNameAlias(aliases[0]?.nameAlias ?? "");
-    } else if (next.length === 0) {
-      setNameAlias("");
-    }
+const ALL_LOCATIONS: (LocationOption & { listName: string })[] = Object.entries(
+  LIST_NAME_TO_ALIASES
+).flatMap(([listName, locs]) => locs.map((l) => ({ ...l, listName })));
+
+function LocationPicker({
+  value,
+  onChange,
+}: {
+  value: SelectedLocation;
+  onChange: (loc: SelectedLocation) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeList, setActiveList] = useState<string | "all">("all");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return ALL_LOCATIONS.filter((l) => {
+      if (activeList !== "all" && l.listName !== activeList) return false;
+      if (!q) return true;
+      return (
+        l.nameAlias.toLowerCase().includes(q) ||
+        l.organizationId.includes(q)
+      );
+    });
+  }, [query, activeList]);
+
+  const select = useCallback((loc: typeof ALL_LOCATIONS[0]) => {
+    onChange({ nameAlias: loc.nameAlias, organizationId: loc.organizationId, listName: loc.listName });
+    setOpen(false);
+    setQuery("");
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 10);
+  }, [open]);
+
+  const listLabel: Record<string, string> = {
+    "Rafał Lubak": "L1",
+    "Rafał Wieczorek": "L2",
+    "Andrzej Chmielewski": "L3",
   };
 
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 flex-wrap">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-muted-foreground">Lista:</span>
-        <div className="flex flex-wrap gap-3">
-          {LIST_OPTIONS.map((option) => {
-            const checked = selectedListNames.includes(option.name);
-            return (
-              <label
-                key={option.id}
-                className="flex items-center gap-1.5 cursor-pointer text-sm"
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 h-9 rounded-md border border-border bg-background px-3 text-sm hover:bg-accent hover:text-accent-foreground transition-colors max-w-sm truncate"
+      >
+        <span className="inline-flex items-center gap-1.5 truncate">
+          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+            {listLabel[value.listName] ?? "?"}
+          </span>
+          <span className="truncate">{value.nameAlias}</span>
+          <span className="shrink-0 text-muted-foreground text-xs">#{value.organizationId}</span>
+        </span>
+        <svg className="ml-auto shrink-0 size-3.5 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-80 rounded-xl border border-border bg-popover shadow-xl">
+          <div className="p-2 border-b border-border">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Szukaj nazwy lub ID organizacji…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="flex gap-1 p-2 border-b border-border flex-wrap">
+            <button
+              onClick={() => setActiveList("all")}
+              className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${activeList === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
+            >
+              Wszystkie
+            </button>
+            {LIST_OPTIONS.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => setActiveList(o.name)}
+                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${activeList === o.name ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
               >
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={() => toggleList(option.name)}
-                />
-                <span>{checked ? "* " : ""}{option.name} ({option.id})</span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-      {isSingleList && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Lokalizacja:</span>
-          <select
-            className="h-8 rounded border border-border bg-background px-2 text-sm max-w-xs disabled:opacity-60"
-            value={nameAlias}
-            onChange={(e) => setNameAlias(e.target.value)}
-            disabled={currentAliases.length === 0}
-          >
-            {currentAliases.length === 0 ? (
-              <option value="">Brak lokalizacji dla tej listy</option>
-            ) : (
-              currentAliases.map((option) => (
-                <option key={option.organizationId} value={option.nameAlias}>
-                  {option.nameAlias}
-                </option>
-              ))
+                {o.id}
+              </button>
+            ))}
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
+            {filtered.length === 0 && (
+              <div className="px-3 py-4 text-center text-sm text-muted-foreground">Brak wyników</div>
             )}
-          </select>
+            {filtered.map((loc) => {
+              const isActive = loc.organizationId === value.organizationId && loc.listName === value.listName;
+              return (
+                <button
+                  key={`${loc.listName}-${loc.organizationId}`}
+                  onClick={() => select(loc)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-accent ${isActive ? "bg-accent/60 font-medium" : ""}`}
+                >
+                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+                    {listLabel[loc.listName] ?? "?"}
+                  </span>
+                  <span className="flex-1 truncate">{loc.nameAlias}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">#{loc.organizationId}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -1464,53 +1521,6 @@ function TableVisibilityToggles({
   );
 }
 
-function parsePolishNumber(s: string): number | null {
-  const cleaned = s.replace(/\s/g, "").replace(",", ".");
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
-function formatPolishNumber(n: number): string {
-  const [int, dec] = n.toFixed(2).split(".");
-  const spaced = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return dec === "00" ? spaced : `${spaced},${dec}`;
-}
-
-function mergeReportRows(rowsArrays: ReportRow[][]): ReportRow[] {
-  const byId = new Map<string, ReportRow>();
-  for (const rows of rowsArrays) {
-    for (const row of rows) {
-      const existing = byId.get(row.id);
-      if (!existing) {
-        byId.set(row.id, { ...row, cells: row.cells.map((c) => ({ ...c })) });
-        continue;
-      }
-      const merged: CellValue[] = existing.cells.map((ec, i) => {
-        const c = row.cells[i];
-        if (!c) return ec;
-        const num = parsePolishNumber(ec.value);
-        const num2 = parsePolishNumber(c.value);
-        if (num != null && num2 != null) {
-          return { value: formatPolishNumber(num + num2), highlight: ec.highlight };
-        }
-        if (ec.value.endsWith("%") && c.value.endsWith("%")) {
-          const n1 = parsePolishNumber(ec.value);
-          const n2 = parsePolishNumber(c.value);
-          if (n1 != null && n2 != null) {
-            return { value: formatPolishNumber((n1 + n2) / 2) + "%", highlight: ec.highlight };
-          }
-        }
-        return ec;
-      });
-      byId.set(row.id, { ...existing, cells: merged });
-    }
-  }
-  return Array.from(byId.values()).sort((a, b) => {
-    const order = ["2026", "2026vs2025", "2025", "2025vs2024", "2024", "2024vs2023", "2023"];
-    return order.indexOf(a.id) - order.indexOf(b.id) || a.id.localeCompare(b.id);
-  });
-}
-
 /** Ensures all T1 rows from reportData template are present. Fills missing rows with "-" cells. */
 function ensureT1RowsComplete(
   fetched: ReportRow[],
@@ -1542,54 +1552,6 @@ function ensureT1RowsComplete(
   });
 }
 
-function mergeKpiRows(rowsArrays: KpiRow[][]): KpiRow[] {
-  const byId = new Map<string, KpiRow>();
-  for (const rows of rowsArrays) {
-    for (const row of rows) {
-      if (!T2_ALLOWED_ROW_IDS.has(row.id)) continue;
-      const existing = byId.get(row.id);
-      if (!existing) {
-        byId.set(row.id, { ...row, cells: [...row.cells] });
-        continue;
-      }
-      const merged = existing.cells.map((ev, i) => {
-        const v = row.cells[i];
-        if (v === "-" || v === undefined) return ev;
-        const n1 = parsePolishNumber(ev);
-        const n2 = parsePolishNumber(v);
-        if (n1 != null && n2 != null) return formatPolishNumber(n1 + n2);
-        return ev;
-      });
-      byId.set(row.id, { ...existing, cells: merged });
-    }
-  }
-  return Array.from(byId.values());
-}
-
-function mergeYtdRows(rowsArrays: YtdRow[][]): YtdRow[] {
-  const byId = new Map<string, YtdRow>();
-  const hasZloty = (ytd: string) => ytd.includes(" zł");
-  for (const rows of rowsArrays) {
-    for (const row of rows) {
-      const existing = byId.get(row.id);
-      if (!existing) {
-        byId.set(row.id, { ...row });
-        continue;
-      }
-      const raw1 = existing.ytd.replace(/\s*zł\s*$/, "");
-      const raw2 = row.ytd.replace(/\s*zł\s*$/, "");
-      const n1 = parsePolishNumber(raw1);
-      const n2 = parsePolishNumber(raw2);
-      if (n1 != null && n2 != null) {
-        const suffix = hasZloty(existing.ytd) || hasZloty(row.ytd) ? " zł" : "";
-        byId.set(row.id, { ...existing, ytd: `${formatPolishNumber(n1 + n2)}${suffix}` });
-      } else {
-        byId.set(row.id, existing);
-      }
-    }
-  }
-  return Array.from(byId.values());
-}
 
 function AppInner({
   onGoAdmin,
@@ -1600,13 +1562,14 @@ function AppInner({
 }) {
   const { user: authUser, logout } = useAuth();
   const { pushLog } = useLogContext();
-  const [t1SelectedLists, setT1SelectedLists] = useState<string[]>([initialListName]);
-  const [t1NameAlias, setT1NameAlias] = useState<string>(initialNameAlias);
-  const [t2SelectedLists, setT2SelectedLists] = useState<string[]>([initialListName]);
-  const [t2NameAlias, setT2NameAlias] = useState<string>(initialNameAlias);
-  const [t5SelectedLists, setT5SelectedLists] = useState<string[]>([initialListName]);
-  const [t5NameAlias, setT5NameAlias] = useState<string>(initialNameAlias);
-
+  const defaultLocation: SelectedLocation = {
+    listName: initialListName,
+    nameAlias: initialNameAlias,
+    organizationId: LIST_NAME_TO_ALIASES[initialListName]?.[0]?.organizationId ?? "",
+  };
+  const [t1Location, setT1Location] = useState<SelectedLocation>(defaultLocation);
+  const [t2Location, setT2Location] = useState<SelectedLocation>(defaultLocation);
+  const [t5Location, setT5Location] = useState<SelectedLocation>(defaultLocation);
   const [t1Visibility, setT1Visibility] = useState<TableVisibility>({
     showId: false,
     showPercent: true,
@@ -1623,24 +1586,9 @@ function AppInner({
     showPln: true,
   });
 
-  const t1SingleList = t1SelectedLists.length === 1 ? t1SelectedLists[0] : "";
-  const t1Aliases = useMemo(
-    () => LIST_NAME_TO_ALIASES[t1SingleList] ?? [],
-    [t1SingleList]
-  );
-  const t1OrgId = t1Aliases.find((a) => a.nameAlias === t1NameAlias)?.organizationId;
-
-  const t2SingleList = t2SelectedLists.length === 1 ? t2SelectedLists[0] : "";
-  const t2Aliases = useMemo(
-    () => LIST_NAME_TO_ALIASES[t2SingleList] ?? [],
-    [t2SingleList]
-  );
-  const t2OrgId = t2Aliases.find((a) => a.nameAlias === t2NameAlias)?.organizationId;
-
-  const t5SingleList = t5SelectedLists.length === 1 ? t5SelectedLists[0] : "";
-  const t5Aliases = LIST_NAME_TO_ALIASES[t5SingleList] ?? [];
-  const t5OrgId = t5Aliases.find((a) => a.nameAlias === t5NameAlias)?.organizationId;
-
+  const t1OrgId = t1Location.organizationId;
+  const t2OrgId = t2Location.organizationId;
+  const t5OrgId = t5Location.organizationId;
   const [t1Data, setT1Data] = useState<ReportRow[]>(reportData);
   const [t2Data, setT2Data] = useState<KpiRow[]>(kpiMonthlyData);
   const [t5Data, setT5Data] = useState<YtdRow[]>(ytdSalesData);
@@ -1682,104 +1630,50 @@ function AppInner({
 
   useEffect(() => {
     let cancelled = false;
-    if (t1SelectedLists.length === 0) return;
+    if (!t1OrgId) return;
+    const listId = LIST_ID_BY_NAME[t1Location.listName] ?? "L1";
     const load = async () => {
       setDataError((e) => ({ ...e, t1: false }));
-      if (t1SelectedLists.length === 1 && t1OrgId) {
-        const listId = LIST_ID_BY_NAME[t1SelectedLists[0]] ?? "L1";
-        const res = await loggedFetch(`${T1_DATA_BASE}/T1${listId}${t1OrgId}.json`, { tableId: "T1", sink: pushLog });
-        const r = res && res.ok ? await res.json() : null;
-        if (!cancelled && Array.isArray(r)) setT1Data(r);
-        else if (!cancelled) setDataError((e) => ({ ...e, t1: true }));
-      } else if (t1SelectedLists.length > 1) {
-        const results: ReportRow[][] = [];
-        for (const listName of t1SelectedLists) {
-          const aliases = LIST_NAME_TO_ALIASES[listName] ?? [];
-          const orgId = aliases[0]?.organizationId;
-          if (!orgId) continue;
-          const listId = LIST_ID_BY_NAME[listName] ?? "L1";
-          const res = await loggedFetch(`${T1_DATA_BASE}/T1${listId}${orgId}.json`, { tableId: "T1", sink: pushLog });
-          const r = res && res.ok ? await res.json() : null;
-          if (Array.isArray(r)) results.push(r);
-        }
-        if (!cancelled && results.length > 0) setT1Data(mergeReportRows(results));
-        else if (!cancelled && results.length === 0) setDataError((e) => ({ ...e, t1: true }));
-      }
+      const res = await loggedFetch(`${T1_DATA_BASE}/T1${listId}${t1OrgId}.json`, { tableId: "T1", sink: pushLog });
+      const r = res && res.ok ? await res.json() : null;
+      if (!cancelled && Array.isArray(r)) setT1Data(r);
+      else if (!cancelled) setDataError((e) => ({ ...e, t1: true }));
     };
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [t1SelectedLists, t1OrgId, pushLog]);
+    return () => { cancelled = true; };
+  }, [t1Location, t1OrgId, pushLog]);
 
   useEffect(() => {
     let cancelled = false;
-    if (t2SelectedLists.length === 0) return;
-    const orgId = t2OrgId ?? t2Aliases[0]?.organizationId;
+    if (!t2OrgId) return;
+    const listId = LIST_ID_BY_NAME[t2Location.listName] ?? "L1";
     const load = async () => {
       setT2ApiTM({});
       setDataError((e) => ({ ...e, t2: false }));
-      if (t2SelectedLists.length === 1 && orgId) {
-        const listId = LIST_ID_BY_NAME[t2SelectedLists[0]] ?? "L1";
-        const url = `${T2_DATA_BASE}/T2${listId}${orgId}.json`;
-        const res = await loggedFetch(url, { tableId: "T2", sink: pushLog });
-        const r = res && res.ok ? await res.json() : null;
-        if (!cancelled && Array.isArray(r))
-          setT2Data(r.filter((row) => T2_ALLOWED_ROW_IDS.has(row.id)));
-        else if (!cancelled) setDataError((e) => ({ ...e, t2: true }));
-      } else if (t2SelectedLists.length > 1) {
-        const results: KpiRow[][] = [];
-        for (const listName of t2SelectedLists) {
-          const aliases = LIST_NAME_TO_ALIASES[listName] ?? [];
-          const oid = aliases[0]?.organizationId;
-          if (!oid) continue;
-          const listId = LIST_ID_BY_NAME[listName] ?? "L1";
-          const res = await loggedFetch(`${T2_DATA_BASE}/T2${listId}${oid}.json`, { tableId: "T2", sink: pushLog });
-          const r = res && res.ok ? await res.json() : null;
-          if (Array.isArray(r)) results.push(r);
-        }
-        if (!cancelled && results.length > 0)
-          setT2Data(mergeKpiRows(results).filter((row) => T2_ALLOWED_ROW_IDS.has(row.id)));
-        else if (!cancelled && results.length === 0) setDataError((e) => ({ ...e, t2: true }));
-      }
+      const res = await loggedFetch(`${T2_DATA_BASE}/T2${listId}${t2OrgId}.json`, { tableId: "T2", sink: pushLog });
+      const r = res && res.ok ? await res.json() : null;
+      if (!cancelled && Array.isArray(r))
+        setT2Data(r.filter((row) => T2_ALLOWED_ROW_IDS.has(row.id)));
+      else if (!cancelled) setDataError((e) => ({ ...e, t2: true }));
     };
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [t2SelectedLists, t2OrgId, t2Aliases, pushLog]);
+    return () => { cancelled = true; };
+  }, [t2Location, t2OrgId, pushLog]);
 
   useEffect(() => {
     let cancelled = false;
-    if (t5SelectedLists.length === 0) return;
+    if (!t5OrgId) return;
+    const listId = LIST_ID_BY_NAME[t5Location.listName] ?? "L1";
     const load = async () => {
       setDataError((e) => ({ ...e, t5: false }));
-      if (t5SelectedLists.length === 1 && t5OrgId) {
-        const listId = LIST_ID_BY_NAME[t5SelectedLists[0]] ?? "L1";
-        const res = await loggedFetch(`${DATA_BASE}/T5${listId}${t5OrgId}.json`, { tableId: "T5", sink: pushLog });
-        const r = res && res.ok ? await res.json() : null;
-        if (!cancelled && Array.isArray(r)) setT5Data(r);
-        else if (!cancelled) setDataError((e) => ({ ...e, t5: true }));
-      } else if (t5SelectedLists.length > 1) {
-        const results: YtdRow[][] = [];
-        for (const listName of t5SelectedLists) {
-          const aliases = LIST_NAME_TO_ALIASES[listName] ?? [];
-          const orgId = aliases[0]?.organizationId;
-          if (!orgId) continue;
-          const listId = LIST_ID_BY_NAME[listName] ?? "L1";
-          const res = await loggedFetch(`${DATA_BASE}/T5${listId}${orgId}.json`, { tableId: "T5", sink: pushLog });
-          const r = res && res.ok ? await res.json() : null;
-          if (Array.isArray(r)) results.push(r);
-        }
-        if (!cancelled && results.length > 0) setT5Data(mergeYtdRows(results));
-        else if (!cancelled && results.length === 0) setDataError((e) => ({ ...e, t5: true }));
-      }
+      const res = await loggedFetch(`${DATA_BASE}/T5${listId}${t5OrgId}.json`, { tableId: "T5", sink: pushLog });
+      const r = res && res.ok ? await res.json() : null;
+      if (!cancelled && Array.isArray(r)) setT5Data(r);
+      else if (!cancelled) setDataError((e) => ({ ...e, t5: true }));
     };
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [t5SelectedLists, t5OrgId, pushLog]);
+    return () => { cancelled = true; };
+  }, [t5Location, t5OrgId, pushLog]);
 
   function scrollToTop() {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1909,13 +1803,9 @@ function AppInner({
           <p className="text-sm text-muted-foreground mb-2">
             Zestawienie miesięczne „net_total_money”: „Wartość sprzedaży netto”, z ostatnich 2 lat.
           </p>
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            <ListLocationMultiSelect
-              selectedListNames={t1SelectedLists}
-              setSelectedListNames={setT1SelectedLists}
-              nameAlias={t1NameAlias}
-              setNameAlias={setT1NameAlias}
-            />
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm text-muted-foreground shrink-0">Lokal:</span>
+            <LocationPicker value={t1Location} onChange={setT1Location} />
           </div>
           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <FetchButton table="t1" orgId={t1OrgId} onT1Result={applyT1Api} />
@@ -1939,13 +1829,9 @@ function AppInner({
           <h2 className="text-xl font-semibold mb-1">
             Kluczowe wskaźniki miesięczne (T2)
           </h2>
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            <ListLocationMultiSelect
-              selectedListNames={t2SelectedLists}
-              setSelectedListNames={setT2SelectedLists}
-              nameAlias={t2NameAlias}
-              setNameAlias={setT2NameAlias}
-            />
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm text-muted-foreground shrink-0">Lokal:</span>
+            <LocationPicker value={t2Location} onChange={setT2Location} />
           </div>
           {dataError.t2 && (
             <p className="mb-2 text-sm text-destructive">
@@ -1992,13 +1878,9 @@ function AppInner({
             <h2 className="text-xl font-semibold mb-1">
               Sprzedaż od początku tego roku (T5)
             </h2>
-            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-              <ListLocationMultiSelect
-                selectedListNames={t5SelectedLists}
-                setSelectedListNames={setT5SelectedLists}
-                nameAlias={t5NameAlias}
-                setNameAlias={setT5NameAlias}
-              />
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-sm text-muted-foreground shrink-0">Lokal:</span>
+              <LocationPicker value={t5Location} onChange={setT5Location} />
             </div>
             <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <FetchButton table="t5" orgId={t5OrgId} onT5Result={applyT5Api} />
