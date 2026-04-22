@@ -1997,8 +1997,8 @@ function AppInner({
           />
           <TableConsole tableId="T2" />
         </section>
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          <div id="t5" data-table-id={TABLE_IDS.T5}>
+        <section id="t5" data-table-id={TABLE_IDS.T5}>
+          <div>
             <h2 className="text-xl font-semibold mb-1">
               Sprzedaż od początku tego roku (T5)
             </h2>
