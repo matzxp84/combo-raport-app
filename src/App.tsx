@@ -811,30 +811,12 @@ function YtdSalesTable({
   data = ytdSalesData,
   hidePln = false,
   showIds = false,
-  chartRows,
-  onChartRowToggle,
 }: {
   data?: YtdRow[];
   hidePln?: boolean;
   showIds?: boolean;
-  chartRows?: Set<string>;
-  onChartRowToggle?: (id: string) => void;
 }) {
   const columns: ColumnDef<YtdRow>[] = useMemo(() => [
-    ...(chartRows && onChartRowToggle ? [{
-      id: "chart-row",
-      enableSorting: false,
-      header: () => <span className="text-xs text-muted-foreground" title="Wykres">📊</span>,
-      cell: ({ row }: { row: { original: YtdRow } }) => (
-        <input
-          type="checkbox"
-          checked={chartRows.has(row.original.id)}
-          onChange={() => onChartRowToggle(row.original.id)}
-          className="size-3.5 cursor-pointer accent-primary"
-          title="Pokaż na wykresie"
-        />
-      ),
-    } as ColumnDef<YtdRow>] : []),
     {
       accessorKey: "category",
       header: () => (
@@ -878,7 +860,7 @@ function YtdSalesTable({
         );
       },
     },
-  ], [showIds, hidePln, chartRows, onChartRowToggle]);
+  ], [showIds, hidePln]);
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns non-memoizable functions by design
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
   return (
@@ -1789,13 +1771,11 @@ function AppInner({
   const T1_ROW_IDS = ["2026", "2025", "2024", "2023"];
   const T1_COL_IDS = MONTHS.map((m) => m.id);
   const T2_COL_IDS = KPI_MONTH_COLUMNS.map((c) => c.label);
-  const T5_ROW_IDS = ["total", "pizza", "other-sales-qty", "drinks"];
 
   const [t1ChartRows, setT1ChartRows] = useState<Set<string>>(new Set(T1_ROW_IDS));
   const [t1ChartCols, setT1ChartCols] = useState<Set<string>>(new Set(T1_COL_IDS));
   const [t2ChartRows, setT2ChartRows] = useState<Set<string>>(new Set(T2_ROW_ORDER));
   const [t2ChartCols, setT2ChartCols] = useState<Set<string>>(new Set(T2_COL_IDS));
-  const [t5ChartRows, setT5ChartRows] = useState<Set<string>>(new Set(T5_ROW_IDS));
 
   function toggleChartSet(setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) {
     setter((prev) => {
@@ -1941,8 +1921,6 @@ function AppInner({
   const t2ChartMonthLabels = KPI_MONTH_COLUMNS
     .filter((c) => t2ChartCols.has(c.label))
     .map((c) => formatKpiMonthDisplay(c.from));
-
-  const t5ChartData = t5Display.filter((r) => t5ChartRows.has(r.id));
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -2145,14 +2123,12 @@ function AppInner({
             />
             </div>
             <div className="mb-4 rounded-lg border border-border bg-card p-3">
-              <T5YtdChart data={t5ChartData} />
+              <T5YtdChart data={t5Display} />
             </div>
             <YtdSalesTable
               data={t5Display}
               hidePln={!t5Visibility.showPln}
               showIds={t5Visibility.showId}
-              chartRows={t5ChartRows}
-              onChartRowToggle={(id) => toggleChartSet(setT5ChartRows, id)}
             />
             <TableConsole tableId="T5" />
           </div>
