@@ -68,8 +68,7 @@ export function LocationsSection() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [savingMsg, setSavingMsg] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshResult, setRefreshResult] = useState<{ ok: number; fail: Array<{ org_id: string; alias: string; error: string }> } | null>(null);
+  const [seeding, setSeeding] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -153,12 +152,19 @@ export function LocationsSection() {
         headers: { "Content-Type": isCsv ? "text/csv" : "application/json" },
         body: text,
       });
-      const d = (await res.json().catch(() => ({}))) as { added?: number; skipped?: number; errors?: string[]; error?: string };
+      const d = (await res.json().catch(() => ({}))) as {
+        added?: number; skipped?: number; errors?: string[];
+        restored?: number; mode?: string; error?: string;
+      };
       if (!res.ok) throw new Error(d.error ?? "Błąd importu");
-      const parts = [`Dodano: ${d.added ?? 0}`, `Pominięto (duplikaty): ${d.skipped ?? 0}`];
-      if (d.errors?.length) parts.push(`Błędy: ${d.errors.length}`);
-      setSavingMsg(parts.join(" · "));
-      if (d.errors?.length) setErr(d.errors.join("\n"));
+      if (d.mode === "restore") {
+        setSavingMsg(`Przywrócono ${d.restored ?? 0} lokalizacji z backupu.`);
+      } else {
+        const parts = [`Dodano: ${d.added ?? 0}`, `Pominięto (duplikaty): ${d.skipped ?? 0}`];
+        if (d.errors?.length) parts.push(`Błędy: ${d.errors.length}`);
+        setSavingMsg(parts.join(" · "));
+        if (d.errors?.length) setErr(d.errors.join("\n"));
+      }
       load();
     } catch (e) {
       setErr((e as Error).message);
@@ -168,20 +174,39 @@ export function LocationsSection() {
     }
   }
 
-  async function onRefresh() {
-    setRefreshing(true);
-    setRefreshResult(null);
+  async function onExport() {
+    try {
+      const res = await authFetch("/api/admin/locations/export");
+      if (!res.ok) throw new Error("Błąd eksportu");
+      const blob = await res.blob();
+      const ts = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `locations_backup_${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
+
+  async function onSeed() {
+    setSeeding(true);
     setErr(null);
     setSavingMsg(null);
     try {
-      const res = await authFetch("/api/admin/locations/refresh", { method: "POST" });
-      const d = (await res.json().catch(() => ({}))) as { ok?: number; fail?: Array<{ org_id: string; alias: string; error: string }>; error?: string };
-      if (!res.ok) throw new Error(d.error ?? "Błąd odświeżania");
-      setRefreshResult({ ok: d.ok ?? 0, fail: d.fail ?? [] });
+      const res = await authFetch("/api/admin/locations/seed", { method: "POST" });
+      const d = (await res.json().catch(() => ({}))) as { added?: number; skipped?: number; total?: number; error?: string };
+      if (!res.ok) throw new Error(d.error ?? "Błąd aktualizacji");
+      setSavingMsg(`Dodano: ${d.added ?? 0} · Pominięto (już istnieją): ${d.skipped ?? 0} · Łącznie: ${d.total ?? 0}`);
+      load();
     } catch (e) {
       setErr((e as Error).message);
     } finally {
-      setRefreshing(false);
+      setSeeding(false);
     }
   }
 
@@ -216,10 +241,17 @@ export function LocationsSection() {
         <Button
           size="sm"
           variant="outline"
-          disabled={refreshing}
-          onClick={onRefresh}
+          disabled={seeding}
+          onClick={onSeed}
         >
-          {refreshing ? "Sprawdzanie…" : "Odśwież"}
+          {seeding ? "Aktualizowanie…" : "Aktualizuj"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onExport}
+        >
+          Eksportuj
         </Button>
         <Button
           size="sm"
@@ -227,7 +259,7 @@ export function LocationsSection() {
           disabled={importing}
           onClick={() => fileInputRef.current?.click()}
         >
-          {importing ? "Importowanie…" : "Dodaj z pliku"}
+          {importing ? "Importowanie…" : "Importuj"}
         </Button>
         <input
           ref={fileInputRef}
@@ -243,23 +275,9 @@ export function LocationsSection() {
       {savingMsg && <p className="text-sm text-emerald-500">{savingMsg}</p>}
       {loading && <p className="text-sm text-muted-foreground">Ładowanie…</p>}
 
-      {refreshResult && (
-        <div className={`rounded-lg border p-3 text-sm ${refreshResult.fail.length > 0 ? "border-destructive/40 bg-destructive/5" : "border-emerald-500/30 bg-emerald-500/5"}`}>
-          <div className="flex items-center justify-between">
-            <span className={refreshResult.fail.length > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}>
-              OK: {refreshResult.ok}{refreshResult.fail.length > 0 ? ` · Błędy: ${refreshResult.fail.length}` : " — wszystkie lokalizacje dostępne"}
-            </span>
-            <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setRefreshResult(null)}>✕</button>
-          </div>
-          {refreshResult.fail.length > 0 && (
-            <ul className="mt-2 flex flex-col gap-1">
-              {refreshResult.fail.map((f) => (
-                <li key={f.org_id} className="text-xs text-destructive">
-                  <span className="font-medium">{f.alias}</span> ({f.org_id}) — {f.error}
-                </li>
-              ))}
-            </ul>
-          )}
+      {locations.length === 0 && !loading && (
+        <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          Brak lokalizacji. Kliknij <strong>Aktualizuj</strong> aby załadować z konfiguracji lub <strong>+ Dodaj</strong> aby dodać ręcznie.
         </div>
       )}
 

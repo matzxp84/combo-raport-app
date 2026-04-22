@@ -58,7 +58,7 @@ let _cache: ManagedLocation[] | null = null;
 export function getLocations(): ManagedLocation[] {
   if (_cache) return _cache;
   if (!existsSync(DATA_PATH)) {
-    _cache = seedFromConfig();
+    _cache = [];
     return _cache;
   }
   try {
@@ -66,7 +66,7 @@ export function getLocations(): ManagedLocation[] {
     _cache = store.locations;
     return _cache;
   } catch {
-    _cache = seedFromConfig();
+    _cache = [];
     return _cache;
   }
 }
@@ -113,6 +113,18 @@ export async function handleLocationsRoute(
   const sub = path.slice("/locations".length); // "" | "/{id}"
   const idMatch = sub.match(/^\/([^/]+)$/);
   const id = idMatch ? idMatch[1] : null;
+
+  // GET /api/admin/locations/export — pobierz plik backup
+  if (req.method === "GET" && sub === "/export") {
+    const locs = getLocations();
+    const ts = new Date().toISOString().slice(0, 10);
+    const payload = JSON.stringify({ locations: locs }, null, 2);
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="locations_backup_${ts}.json"`);
+    res.end(payload);
+    return true;
+  }
 
   // GET /api/admin/locations
   if (req.method === "GET" && !id) {
@@ -201,6 +213,25 @@ export async function handleLocationsRoute(
     return true;
   }
 
+  // POST /api/admin/locations/seed  — załaduj z config/locations.json (merge, nie nadpisuje)
+  if (req.method === "POST" && sub === "/seed") {
+    const fromConfig = seedFromConfig();
+    const locs = getLocations();
+    const added: string[] = [];
+    const skipped: string[] = [];
+    for (const loc of fromConfig) {
+      if (locs.some((l) => l.organization_id === loc.organization_id)) {
+        skipped.push(loc.organization_id);
+      } else {
+        locs.push(loc);
+        added.push(loc.organization_id);
+      }
+    }
+    if (added.length > 0) saveLocations(locs);
+    json(res, 200, { added: added.length, skipped: skipped.length, total: locs.length });
+    return true;
+  }
+
   // POST /api/admin/locations/import  — merge z JSON/CSV
   if (req.method === "POST" && sub === "/import") {
     let raw: string;
@@ -215,7 +246,21 @@ export async function handleLocationsRoute(
     let rows: ImportRow[] = [];
 
     const ct = (req.headers["content-type"] ?? "").toLowerCase();
-    if (ct.includes("text/csv") || raw.trimStart().startsWith("organization_id") || raw.trimStart().startsWith("org")) {
+    // detect backup format { locations: [...] } — pełne przywrócenie
+    if (!ct.includes("text/csv") && !raw.trimStart().startsWith("organization_id")) {
+      try {
+        const parsed = JSON.parse(raw) as { locations?: ManagedLocation[] } | ImportRow | ImportRow[];
+        if (parsed && !Array.isArray(parsed) && "locations" in parsed && Array.isArray(parsed.locations)) {
+          saveLocations(parsed.locations);
+          json(res, 200, { restored: parsed.locations.length, mode: "restore" });
+          return true;
+        }
+        rows = Array.isArray(parsed) ? parsed : [parsed as ImportRow];
+      } catch {
+        json(res, 400, { error: "Nieprawidłowy format — wymagany JSON (obiekt/tablica) lub CSV" });
+        return true;
+      }
+    } else {
       // CSV: pierwsza linia = nagłówki
       const lines = raw.trim().split(/\r?\n/);
       const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
@@ -225,14 +270,6 @@ export async function handleLocationsRoute(
         const row: Record<string, string> = {};
         headers.forEach((h, i) => { row[h] = vals[i] ?? ""; });
         rows.push(row as ImportRow);
-      }
-    } else {
-      try {
-        const parsed = JSON.parse(raw) as ImportRow | ImportRow[];
-        rows = Array.isArray(parsed) ? parsed : [parsed];
-      } catch {
-        json(res, 400, { error: "Nieprawidłowy format — wymagany JSON (obiekt/tablica) lub CSV" });
-        return true;
       }
     }
 
