@@ -1356,6 +1356,7 @@ function LocationPicker({
   values: SelectedLocation[];
   onChange: (locs: SelectedLocation[]) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -1390,105 +1391,107 @@ function LocationPicker({
   );
 
   return (
-    <div className="w-full rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
-      <div className="flex items-center gap-3 flex-wrap">
-        <input
-          type="text"
-          placeholder="Szukaj po nazwie lub ID organizacji…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-9 flex-1 min-w-48 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-        />
-        {query && (
-          <button onClick={() => setQuery("")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            Wyczyść
-          </button>
-        )}
-        {values.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs text-muted-foreground">Wybrane ({values.length}):</span>
-            {values.map((v) => (
-              <span
-                key={`${v.listName}|${v.organizationId}`}
-                className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-              >
-                <span className="opacity-60">{LIST_LABEL[v.listName] ?? "?"}</span>
-                {v.nameAlias}
-                <button
-                  onClick={() => toggle({ ...v })}
-                  className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
-                >×</button>
-              </span>
-            ))}
-          </div>
-        )}
+    <div className="w-full rounded-xl border border-border bg-card px-4 py-3 flex flex-col gap-2">
+      {/* always-visible summary bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-primary bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+        >
+          {open ? "▲ ZWIŃ" : "▼ WYBIERZ"}
+        </button>
+        <span className="text-xs text-muted-foreground shrink-0">Wybrane ({values.length}):</span>
+        {values.map((v) => (
+          <span
+            key={`${v.listName}|${v.organizationId}`}
+            className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+          >
+            <span className="opacity-60">{LIST_LABEL[v.listName] ?? "?"}</span>
+            {v.nameAlias}
+            <button
+              onClick={() => toggle({ ...v })}
+              className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+            >×</button>
+          </span>
+        ))}
       </div>
 
-      {byList.size === 0 && (
-        <p className="text-sm text-muted-foreground py-2">Brak wyników dla „{query}"</p>
-      )}
+      {/* collapsible panel */}
+      {open && (
+        <div className="flex flex-col gap-3 pt-2 border-t border-border">
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Szukaj po nazwie lub ID organizacji…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-9 flex-1 min-w-48 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+            {query && (
+              <button onClick={() => setQuery("")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Wyczyść
+              </button>
+            )}
+          </div>
 
-      {LIST_OPTIONS.map((opt) => {
-        const locs = byList.get(opt.name);
-        if (!locs || locs.length === 0) return null;
-        return (
-          <div key={opt.id}>
-            <div className="mb-2 flex items-center gap-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                {opt.id} — {opt.name}
-              </p>
-              {(() => {
-                const allSelected = locs.every((l) => values.some((v) => v.organizationId === l.organizationId && v.listName === l.listName));
-                return allSelected ? (
+          {byList.size === 0 && (
+            <p className="text-sm text-muted-foreground py-1">Brak wyników dla „{query}"</p>
+          )}
+
+          {LIST_OPTIONS.map((opt) => {
+            const locs = byList.get(opt.name);
+            if (!locs || locs.length === 0) return null;
+            const allSelected = locs.every((l) => values.some((v) => v.organizationId === l.organizationId && v.listName === l.listName));
+            return (
+              <div key={opt.id}>
+                <div className="mb-2 flex items-center gap-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {opt.id} — {opt.name}
+                  </p>
                   <button
                     onClick={() => {
                       const keys = new Set(locs.map((l) => `${l.listName}|${l.organizationId}`));
-                      const remaining = values.filter((v) => !keys.has(`${v.listName}|${v.organizationId}`));
-                      onChange(remaining.length > 0 ? remaining : [{ ...locs[0] }]);
+                      if (allSelected) {
+                        const remaining = values.filter((v) => !keys.has(`${v.listName}|${v.organizationId}`));
+                        onChange(remaining.length > 0 ? remaining : [{ ...locs[0] }]);
+                      } else {
+                        const existingKeys = new Set(values.map((v) => `${v.listName}|${v.organizationId}`));
+                        const toAdd = locs.filter((l) => !existingKeys.has(`${l.listName}|${l.organizationId}`));
+                        onChange([...values, ...toAdd]);
+                      }
                     }}
                     className="text-xs text-primary hover:underline"
                   >
-                    Odznacz wszystkie
+                    {allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie"}
                   </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      const keys = new Set(values.map((v) => `${v.listName}|${v.organizationId}`));
-                      const toAdd = locs.filter((l) => !keys.has(`${l.listName}|${l.organizationId}`));
-                      onChange([...values, ...toAdd]);
-                    }}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Zaznacz wszystkie
-                  </button>
-                );
-              })()}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {locs.map((loc) => {
-                const isActive = values.some(
-                  (v) => v.organizationId === loc.organizationId && v.listName === loc.listName
-                );
-                return (
-                  <button
-                    key={`${loc.listName}-${loc.organizationId}`}
-                    onClick={() => toggle(loc)}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                      isActive
-                        ? "border-primary bg-primary/10 text-primary font-medium"
-                        : "border-border bg-background hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    <span className={`size-2 rounded-sm shrink-0 border ${isActive ? "bg-primary border-primary" : "border-muted-foreground/40"}`} />
-                    {loc.nameAlias}
-                    <span className="text-xs text-muted-foreground">#{loc.organizationId}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {locs.map((loc) => {
+                    const isActive = values.some(
+                      (v) => v.organizationId === loc.organizationId && v.listName === loc.listName
+                    );
+                    return (
+                      <button
+                        key={`${loc.listName}-${loc.organizationId}`}
+                        onClick={() => toggle(loc)}
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "border-border bg-background hover:bg-accent hover:text-accent-foreground"
+                        }`}
+                      >
+                        <span className={`size-2 rounded-sm shrink-0 border ${isActive ? "bg-primary border-primary" : "border-muted-foreground/40"}`} />
+                        {loc.nameAlias}
+                        <span className="text-xs text-muted-foreground">#{loc.organizationId}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
