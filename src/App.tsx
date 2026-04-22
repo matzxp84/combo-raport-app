@@ -931,6 +931,7 @@ function ReportTable({
   hidePercent = false,
   chartRows,
   onChartRowToggle,
+  chartRowsAllowed,
   chartCols,
   onChartColToggle,
 }: {
@@ -939,6 +940,7 @@ function ReportTable({
   hidePercent?: boolean;
   chartRows?: Set<string>;
   onChartRowToggle?: (id: string) => void;
+  chartRowsAllowed?: Set<string>;
   chartCols?: Set<string>;
   onChartColToggle?: (id: string) => void;
 }) {
@@ -957,7 +959,7 @@ function ReportTable({
         const slug = GOPOS_ROW_SLUGS[row.original.id];
         return (
           <span className="inline-flex items-start gap-1.5">
-            {chartRows && onChartRowToggle && (
+            {chartRows && onChartRowToggle && (!chartRowsAllowed || chartRowsAllowed.has(row.original.id)) && (
               <input
                 type="checkbox"
                 checked={chartRows.has(row.original.id)}
@@ -1121,7 +1123,7 @@ function ReportTable({
         </span>
       ),
     },
-  ], [showIds, hidePercent, chartRows, chartCols, onChartRowToggle, onChartColToggle]);
+  ], [showIds, hidePercent, chartRows, chartRowsAllowed, chartCols, onChartRowToggle, onChartColToggle]);
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns non-memoizable functions by design
   const table = useReactTable({
@@ -1762,7 +1764,7 @@ function AppInner({
   });
 
   // Chart row/col selectors
-  const T1_ROW_IDS = ["2026", "2025", "2024", "2023"];
+  const T1_ROW_IDS = ["2026vs2025", "2025vs2024"];
   const T1_COL_IDS = MONTHS.map((m) => m.id);
   const T2_COL_IDS = KPI_MONTH_COLUMNS.map((c) => c.label);
 
@@ -2044,11 +2046,12 @@ function AppInner({
             <T1VolumeChart data={t1ChartData} monthLabels={t1ChartMonthLabels} />
           </div>
           <ReportTable
-            data={t1Display}
+            data={t1Display.filter((r) => r.id !== "2024vs2023")}
             showIds={t1Visibility.showId}
             hidePercent={!t1Visibility.showPercent}
             chartRows={t1ChartRows}
             onChartRowToggle={(id) => toggleChartSet(setT1ChartRows, id)}
+            chartRowsAllowed={new Set(T1_ROW_IDS)}
             chartCols={t1ChartCols}
             onChartColToggle={(id) => toggleChartSet(setT1ChartCols, id)}
           />
