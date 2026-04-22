@@ -1443,11 +1443,14 @@ function LocationPicker({
             </div>
           )}
 
-          {mode === "search" && byList.size === 0 && (
+          {mode === "search" && !query && (
+            <p className="text-sm text-muted-foreground py-1">Wpisz nazwę lub ID organizacji…</p>
+          )}
+          {mode === "search" && query && byList.size === 0 && (
             <p className="text-sm text-muted-foreground py-1">Brak wyników dla „{query}"</p>
           )}
 
-          <div className="grid grid-cols-3 gap-4">
+          {(mode === "browse" || (mode === "search" && !!query)) && <div className={mode === "search" ? "flex flex-col gap-1.5" : "grid grid-cols-3 gap-4"}>
           {LIST_OPTIONS.map((opt) => {
             const locs = byList.get(opt.name);
             if (!locs || locs.length === 0) return null;
@@ -1500,7 +1503,7 @@ function LocationPicker({
               </div>
             );
           })}
-          </div>
+          </div>}
         </div>
       )}
     </div>
