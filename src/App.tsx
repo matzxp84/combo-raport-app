@@ -663,10 +663,8 @@ function KpiMonthlyTable({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end gap-2">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              <Columns3 className="size-3.5 mr-1" /> Kolumny
-            </Button>
+          <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Columns3 className="size-3.5" /> Kolumny
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
             <DropdownMenuLabel>Widoczne kolumny</DropdownMenuLabel>
@@ -1091,10 +1089,8 @@ function ReportTable({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end gap-2">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              <Columns3 className="size-3.5 mr-1" /> Kolumny
-            </Button>
+          <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Columns3 className="size-3.5" /> Kolumny
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
             <DropdownMenuLabel>Widoczne kolumny</DropdownMenuLabel>
@@ -1875,15 +1871,11 @@ function AppInner({
           <div className="flex items-center gap-2">
             <DarkModeToggle />
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Konto użytkownika"
-                  className="rounded-full"
-                >
-                  <UserCircle className="size-5 text-muted-foreground" />
-                </Button>
+              <DropdownMenuTrigger
+                aria-label="Konto użytkownika"
+                className="inline-flex size-9 items-center justify-center rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <UserCircle className="size-5" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
