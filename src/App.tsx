@@ -1433,9 +1433,37 @@ function LocationPicker({
         if (!locs || locs.length === 0) return null;
         return (
           <div key={opt.id}>
-            <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              {opt.id} — {opt.name}
-            </p>
+            <div className="mb-2 flex items-center gap-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {opt.id} — {opt.name}
+              </p>
+              {(() => {
+                const allSelected = locs.every((l) => values.some((v) => v.organizationId === l.organizationId && v.listName === l.listName));
+                return allSelected ? (
+                  <button
+                    onClick={() => {
+                      const keys = new Set(locs.map((l) => `${l.listName}|${l.organizationId}`));
+                      const remaining = values.filter((v) => !keys.has(`${v.listName}|${v.organizationId}`));
+                      onChange(remaining.length > 0 ? remaining : [{ ...locs[0] }]);
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Odznacz wszystkie
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const keys = new Set(values.map((v) => `${v.listName}|${v.organizationId}`));
+                      const toAdd = locs.filter((l) => !keys.has(`${l.listName}|${l.organizationId}`));
+                      onChange([...values, ...toAdd]);
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Zaznacz wszystkie
+                  </button>
+                );
+              })()}
+            </div>
             <div className="flex flex-wrap gap-2">
               {locs.map((loc) => {
                 const isActive = values.some(
