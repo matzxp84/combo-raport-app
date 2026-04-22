@@ -539,20 +539,6 @@ function KpiMonthlyTable({
   const [expanded, setExpanded] = useState(false);
 
   const columns: ColumnDef<KpiRow>[] = useMemo(() => [
-    ...(chartRows && onChartRowToggle ? [{
-      id: "chart-row",
-      enableSorting: false,
-      header: () => <span className="text-xs text-muted-foreground" title="Wykres">📊</span>,
-      cell: ({ row }: { row: { original: KpiRow } }) => (
-        <input
-          type="checkbox"
-          checked={chartRows.has(row.original.id)}
-          onChange={() => onChartRowToggle(row.original.id)}
-          className="size-3.5 cursor-pointer accent-primary"
-          title="Pokaż na wykresie"
-        />
-      ),
-    } as ColumnDef<KpiRow>] : []),
     {
       accessorKey: "label",
       header: () => <span className="text-xs text-muted-foreground">Wskaźnik</span>,
@@ -561,19 +547,30 @@ function KpiMonthlyTable({
         const labelId = showIds ? formatRowIndexId(row.index) : undefined;
         const slug = GOPOS_ROW_SLUGS[row.original.id];
         return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex flex-col leading-tight cursor-help">
-                <KpiLabelCell label={getValue() as string} labelId={labelId} />
-                <SlugBadge slug={slug} />
-              </span>
-            </TooltipTrigger>
-            <InfoTooltipContent side="right">
-              <strong className="text-sm">{getValue() as string}</strong>
-              <span className="text-xs">Row id: <code>{row.original.id}</code></span>
-              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
-            </InfoTooltipContent>
-          </Tooltip>
+          <span className="inline-flex items-start gap-1.5">
+            {chartRows && onChartRowToggle && (
+              <input
+                type="checkbox"
+                checked={chartRows.has(row.original.id)}
+                onChange={() => onChartRowToggle(row.original.id)}
+                className="mt-0.5 size-3 shrink-0 cursor-pointer opacity-40 hover:opacity-70 transition-opacity"
+                title="Pokaż na wykresie"
+              />
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex flex-col leading-tight cursor-help">
+                  <KpiLabelCell label={getValue() as string} labelId={labelId} />
+                  <SlugBadge slug={slug} />
+                </span>
+              </TooltipTrigger>
+              <InfoTooltipContent side="right">
+                <strong className="text-sm">{getValue() as string}</strong>
+                <span className="text-xs">Row id: <code>{row.original.id}</code></span>
+                {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+              </InfoTooltipContent>
+            </Tooltip>
+          </span>
         );
       },
     },
@@ -950,20 +947,6 @@ function ReportTable({
   const [expanded, setExpanded] = useState(false);
 
   const columns: ColumnDef<ReportRow>[] = useMemo(() => [
-    ...(chartRows && onChartRowToggle ? [{
-      id: "chart-row",
-      enableSorting: false,
-      header: () => <span className="text-xs text-muted-foreground" title="Wykres">📊</span>,
-      cell: ({ row }: { row: { original: ReportRow } }) => (
-        <input
-          type="checkbox"
-          checked={chartRows.has(row.original.id)}
-          onChange={() => onChartRowToggle(row.original.id)}
-          className="size-3.5 cursor-pointer accent-primary"
-          title="Pokaż na wykresie"
-        />
-      ),
-    } as ColumnDef<ReportRow>] : []),
     {
       accessorKey: "label",
       header: () => <span className="text-xs text-muted-foreground">Wiersz</span>,
@@ -973,23 +956,34 @@ function ReportTable({
         const displayId = getDisplayRowId(label, row.original.id);
         const slug = GOPOS_ROW_SLUGS[row.original.id];
         return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex flex-col leading-tight cursor-help">
-                <span className="font-medium">{label}</span>
-                {showIds && (
-                  <span className="text-muted-foreground text-xs">ID:{displayId}</span>
-                )}
-                <SlugBadge slug={slug} />
-              </span>
-            </TooltipTrigger>
-            <InfoTooltipContent side="right">
-              <strong className="text-sm">{label}</strong>
-              <span className="text-xs">ID wiersza: <code>{displayId}</code></span>
-              {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
-              <span className="text-xs text-muted-foreground">Raw id: {row.original.id}</span>
-            </InfoTooltipContent>
-          </Tooltip>
+          <span className="inline-flex items-start gap-1.5">
+            {chartRows && onChartRowToggle && (
+              <input
+                type="checkbox"
+                checked={chartRows.has(row.original.id)}
+                onChange={() => onChartRowToggle(row.original.id)}
+                className="mt-0.5 size-3 shrink-0 cursor-pointer opacity-40 hover:opacity-70 transition-opacity"
+                title="Pokaż na wykresie"
+              />
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex flex-col leading-tight cursor-help">
+                  <span className="font-medium">{label}</span>
+                  {showIds && (
+                    <span className="text-muted-foreground text-xs">ID:{displayId}</span>
+                  )}
+                  <SlugBadge slug={slug} />
+                </span>
+              </TooltipTrigger>
+              <InfoTooltipContent side="right">
+                <strong className="text-sm">{label}</strong>
+                <span className="text-xs">ID wiersza: <code>{displayId}</code></span>
+                {slug && <span className="text-xs">Slug GOPOS: <code>{slug}</code></span>}
+                <span className="text-xs text-muted-foreground">Raw id: {row.original.id}</span>
+              </InfoTooltipContent>
+            </Tooltip>
+          </span>
         );
       },
     },
