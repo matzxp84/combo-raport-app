@@ -1438,6 +1438,7 @@ function LocationPicker({
             <p className="text-sm text-muted-foreground py-1">Brak wyników dla „{query}"</p>
           )}
 
+          <div className="grid grid-cols-3 gap-4">
           {LIST_OPTIONS.map((opt) => {
             const locs = byList.get(opt.name);
             if (!locs || locs.length === 0) return null;
@@ -1465,7 +1466,7 @@ function LocationPicker({
                     {allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie"}
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-1.5">
                   {locs.map((loc) => {
                     const isActive = values.some(
                       (v) => v.organizationId === loc.organizationId && v.listName === loc.listName
@@ -1490,6 +1491,7 @@ function LocationPicker({
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>
