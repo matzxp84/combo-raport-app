@@ -1772,13 +1772,10 @@ function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<a href="/" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-white">
-                <img src="/vite.svg" alt="Logo" className="size-6" />
+              <div className="flex aspect-square size-16 items-center justify-center rounded-lg bg-white">
+                <img src="/vite.svg" alt="Logo" className="size-12" />
               </div>
-              <div className="flex flex-col leading-tight">
-                <span className="font-semibold text-sm">Combo Raport</span>
-                <span className="text-xs text-sidebar-foreground/60">v0.0.1</span>
-              </div>
+              <span className="font-bold text-base uppercase tracking-wide">Combo Raport</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
