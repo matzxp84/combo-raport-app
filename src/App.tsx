@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -1343,6 +1343,12 @@ const ALL_LOCATIONS: (LocationOption & { listName: string })[] = Object.entries(
   LIST_NAME_TO_ALIASES
 ).flatMap(([listName, locs]) => locs.map((l) => ({ ...l, listName })));
 
+const LIST_LABEL: Record<string, string> = {
+  "Rafał Lubak": "L1",
+  "Rafał Wieczorek": "L2",
+  "Andrzej Chmielewski": "L3",
+};
+
 function LocationPicker({
   value,
   onChange,
@@ -1350,118 +1356,103 @@ function LocationPicker({
   value: SelectedLocation;
   onChange: (loc: SelectedLocation) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [activeList, setActiveList] = useState<string | "all">("all");
-  const ref = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return ALL_LOCATIONS.filter((l) => {
-      if (activeList !== "all" && l.listName !== activeList) return false;
-      if (!q) return true;
-      return (
+    if (!q) return ALL_LOCATIONS;
+    return ALL_LOCATIONS.filter(
+      (l) =>
         l.nameAlias.toLowerCase().includes(q) ||
         l.organizationId.includes(q)
-      );
-    });
-  }, [query, activeList]);
+    );
+  }, [query]);
 
-  const select = useCallback((loc: typeof ALL_LOCATIONS[0]) => {
-    onChange({ nameAlias: loc.nameAlias, organizationId: loc.organizationId, listName: loc.listName });
-    setOpen(false);
-    setQuery("");
-  }, [onChange]);
+  const byList = useMemo(() => {
+    const map = new Map<string, typeof ALL_LOCATIONS>();
+    for (const loc of filtered) {
+      if (!map.has(loc.listName)) map.set(loc.listName, []);
+      map.get(loc.listName)!.push(loc);
+    }
+    return map;
+  }, [filtered]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 10);
-  }, [open]);
-
-  const listLabel: Record<string, string> = {
-    "Rafał Lubak": "L1",
-    "Rafał Wieczorek": "L2",
-    "Andrzej Chmielewski": "L3",
-  };
+  const select = useCallback(
+    (loc: typeof ALL_LOCATIONS[0]) => {
+      onChange({ nameAlias: loc.nameAlias, organizationId: loc.organizationId, listName: loc.listName });
+    },
+    [onChange]
+  );
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 h-9 rounded-md border border-border bg-background px-3 text-sm hover:bg-accent hover:text-accent-foreground transition-colors max-w-sm truncate"
-      >
-        <span className="inline-flex items-center gap-1.5 truncate">
-          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
-            {listLabel[value.listName] ?? "?"}
+    <div className="w-full rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          placeholder="Szukaj po nazwie lub ID organizacji…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-9 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Wyczyść
+          </button>
+        )}
+        <span className="shrink-0 text-sm text-muted-foreground">
+          Wybrany:
+          <span className="ml-1.5 inline-flex items-center gap-1 font-medium text-foreground">
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+              {LIST_LABEL[value.listName] ?? "?"}
+            </span>
+            {value.nameAlias}
+            <span className="text-muted-foreground font-normal">#{value.organizationId}</span>
           </span>
-          <span className="truncate">{value.nameAlias}</span>
-          <span className="shrink-0 text-muted-foreground text-xs">#{value.organizationId}</span>
         </span>
-        <svg className="ml-auto shrink-0 size-3.5 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
+      </div>
 
-      {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-80 rounded-xl border border-border bg-popover shadow-xl">
-          <div className="p-2 border-b border-border">
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="Szukaj nazwy lub ID organizacji…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-          <div className="flex gap-1 p-2 border-b border-border flex-wrap">
-            <button
-              onClick={() => setActiveList("all")}
-              className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${activeList === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
-            >
-              Wszystkie
-            </button>
-            {LIST_OPTIONS.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => setActiveList(o.name)}
-                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${activeList === o.name ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
-              >
-                {o.id}
-              </button>
-            ))}
-          </div>
-          <div className="max-h-64 overflow-y-auto py-1">
-            {filtered.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-muted-foreground">Brak wyników</div>
-            )}
-            {filtered.map((loc) => {
-              const isActive = loc.organizationId === value.organizationId && loc.listName === value.listName;
-              return (
-                <button
-                  key={`${loc.listName}-${loc.organizationId}`}
-                  onClick={() => select(loc)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-accent ${isActive ? "bg-accent/60 font-medium" : ""}`}
-                >
-                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
-                    {listLabel[loc.listName] ?? "?"}
-                  </span>
-                  <span className="flex-1 truncate">{loc.nameAlias}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">#{loc.organizationId}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      {byList.size === 0 && (
+        <p className="text-sm text-muted-foreground py-2">Brak wyników dla „{query}"</p>
       )}
+
+      {LIST_OPTIONS.map((opt) => {
+        const locs = byList.get(opt.name);
+        if (!locs || locs.length === 0) return null;
+        return (
+          <div key={opt.id}>
+            <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {opt.id} — {opt.name}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {locs.map((loc) => {
+                const isActive =
+                  loc.organizationId === value.organizationId &&
+                  loc.listName === value.listName;
+                return (
+                  <button
+                    key={`${loc.listName}-${loc.organizationId}`}
+                    onClick={() => select(loc)}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      isActive
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "border-border bg-background hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <span
+                      className={`size-2 rounded-full shrink-0 ${isActive ? "bg-primary" : "bg-muted-foreground/40"}`}
+                    />
+                    {loc.nameAlias}
+                    <span className="text-xs text-muted-foreground">#{loc.organizationId}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1803,8 +1794,7 @@ function AppInner({
           <p className="text-sm text-muted-foreground mb-2">
             Zestawienie miesięczne „net_total_money”: „Wartość sprzedaży netto”, z ostatnich 2 lat.
           </p>
-          <div className="mb-2 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground shrink-0">Lokal:</span>
+          <div className="mb-4">
             <LocationPicker value={t1Location} onChange={setT1Location} />
           </div>
           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -1829,8 +1819,7 @@ function AppInner({
           <h2 className="text-xl font-semibold mb-1">
             Kluczowe wskaźniki miesięczne (T2)
           </h2>
-          <div className="mb-2 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground shrink-0">Lokal:</span>
+          <div className="mb-4">
             <LocationPicker value={t2Location} onChange={setT2Location} />
           </div>
           {dataError.t2 && (
@@ -1878,8 +1867,7 @@ function AppInner({
             <h2 className="text-xl font-semibold mb-1">
               Sprzedaż od początku tego roku (T5)
             </h2>
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-sm text-muted-foreground shrink-0">Lokal:</span>
+            <div className="mb-4">
               <LocationPicker value={t5Location} onChange={setT5Location} />
             </div>
             <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
