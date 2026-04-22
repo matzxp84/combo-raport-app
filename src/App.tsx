@@ -32,13 +32,12 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
-  SidebarSeparator,
   SidebarInset,
+  SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   UserCircle,
-  Home,
-  ArrowUp,
   ArrowUpDown,
   ArrowDown,
   ArrowUp as ArrowUpIcon,
@@ -46,6 +45,10 @@ import {
   User,
   Settings,
   LogOut,
+  BarChart3,
+  TrendingUp,
+  CalendarDays,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FetchButton } from "@/components/fetch-button";
@@ -76,7 +79,7 @@ import { T5YtdChart } from "@/components/charts/T5YtdChart";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
-function DarkModeToggle() {
+function DarkModeToggle({ sidebar }: { sidebar?: boolean } = {}) {
   const { theme, setTheme } = useTheme();
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
@@ -96,6 +99,19 @@ function DarkModeToggle() {
   }, [systemPrefersDark, theme]);
 
   const isDark = resolvedTheme === "dark";
+  const toggle = () => setTheme(isDark ? "light" : "dark");
+
+  if (sidebar) {
+    return (
+      <SidebarMenuButton tooltip={isDark ? "Tryb jasny" : "Tryb ciemny"} onClick={toggle}>
+        {isDark
+          ? <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          : <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        }
+        <span>{isDark ? "Tryb jasny" : "Tryb ciemny"}</span>
+      </SidebarMenuButton>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">
@@ -1730,6 +1746,121 @@ function mergeYtdRows(rowsArrays: YtdRow[][]): YtdRow[] {
   return Array.from(byId.values());
 }
 
+function AppSidebar({
+  showAdminNav,
+  onGoAdmin,
+  authUser,
+  logout,
+}: {
+  showAdminNav: boolean;
+  onGoAdmin?: () => void;
+  authUser?: { name?: string; email?: string } | null;
+  logout: () => void;
+}) {
+  const { isMobile } = useSidebar();
+
+  const navItems = [
+    { href: "#t1", icon: BarChart3, label: "T1 — Wolumen miesięczny" },
+    { href: "#t2", icon: TrendingUp, label: "T2 — KPI miesięczne" },
+    { href: "#t5", icon: CalendarDays, label: "T5 — Sprzedaż YTD" },
+  ];
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" render={<a href="/" />}>
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <img src="/vite.svg" alt="Logo" className="size-5 invert" />
+              </div>
+              <div className="flex flex-col leading-tight">
+                <span className="font-semibold text-sm">Combo Raport</span>
+                <span className="text-xs text-sidebar-foreground/60">v0.0.1</span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Sekcje raportu</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map(({ href, icon: Icon, label }) => (
+                <SidebarMenuItem key={href}>
+                  <SidebarMenuButton tooltip={label} render={<a href={href} />}>
+                    <Icon />
+                    <span>{label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {showAdminNav && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administracja</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Panel admina" onClick={() => onGoAdmin?.()}>
+                    <ShieldCheck />
+                    <span>Panel admina</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+      </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DarkModeToggle sidebar />
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={authUser?.name ?? "Konto"}
+                >
+                  <UserCircle className="size-5 shrink-0" />
+                  <div className="flex flex-col leading-tight min-w-0">
+                    <span className="truncate font-medium text-sm">{authUser?.name ?? "Gość"}</span>
+                    <span className="truncate text-xs text-sidebar-foreground/60">{authUser?.email}</span>
+                  </div>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side={isMobile ? "top" : "right"} align="end" className="w-56">
+                <DropdownMenuLabel>
+                  {authUser?.name ?? "Gość"}
+                  <div className="text-xs font-normal text-muted-foreground">{authUser?.email}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  <User className="size-4 mr-2" /> Profil
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <Settings className="size-4 mr-2" /> Ustawienia
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => logout()}>
+                  <LogOut className="size-4 mr-2" /> Wyloguj
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
 function AppInner({
   onGoAdmin,
   showAdminNav,
@@ -1883,10 +2014,6 @@ function AppInner({
     return () => { cancelled = true; };
   }, [t5Locations, pushLog]);
 
-  function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
   const t1Base = dataError.t1
     ? reportData.map((r) => ({ ...r, cells: r.cells.map(() => ({ value: "-" })) }))
     : t1Data;
@@ -1919,109 +2046,19 @@ function AppInner({
     .map((c) => formatKpiMonthDisplay(c.from));
 
   return (
-    <SidebarProvider defaultOpen={false}>
-      <Sidebar collapsible="offcanvas">
-        <SidebarHeader className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            <img src="/vite.svg" alt="Logo" className="size-6" />
-            <span className="font-semibold text-sm">Combo Raport</span>
-          </div>
-        </SidebarHeader>
-        <SidebarSeparator />
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Sekcje raportu</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    render={
-                      <a href="#t1">
-                        <span>T1 — Wolumen miesięczny</span>
-                      </a>
-                    }
-                  />
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    render={
-                      <a href="#t2">
-                        <span>T2 — KPI miesięczne</span>
-                      </a>
-                    }
-                  />
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    render={
-                      <a href="#t5">
-                        <span>T5 — Sprzedaż YTD</span>
-                      </a>
-                    }
-                  />
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          {showAdminNav && (
-            <SidebarGroup>
-              <SidebarGroupLabel>Administracja</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => onGoAdmin?.()}
-                    >
-                      <span>Panel admina</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
-        </SidebarContent>
-      </Sidebar>
+    <SidebarProvider defaultOpen={true}>
+      <AppSidebar
+        showAdminNav={showAdminNav}
+        onGoAdmin={onGoAdmin}
+        authUser={authUser}
+        logout={logout}
+      />
       <SidebarInset>
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-card px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <SidebarTrigger />
-            <img src="/vite.svg" alt="Logo" className="size-8" />
-            <span className="font-semibold text-lg">Combo Raport</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <DarkModeToggle />
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                aria-label="Konto użytkownika"
-                className="inline-flex size-9 items-center justify-center rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <UserCircle className="size-5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  {authUser?.name ?? "Gość"}
-                  <div className="text-xs font-normal text-muted-foreground">
-                    {authUser?.email}
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  <User className="size-4 mr-2" /> Profil
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <Settings className="size-4 mr-2" /> Ustawienia
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => logout()}>
-                  <LogOut className="size-4 mr-2" /> Wyloguj
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-card sticky top-0 z-20">
+          <SidebarTrigger />
+          <span className="font-semibold text-base">Combo Raport</span>
         </div>
-      </header>
       <main className="flex-1">
         <div className="w-full px-[5%] py-10 flex flex-col gap-8">
         <section id="t1" data-table-id={TABLE_IDS.T1} className="rounded-2xl border border-border bg-card px-6 py-6 shadow-sm">
@@ -2132,34 +2169,7 @@ function AppInner({
         </section>
         </div>
       </main>
-      <footer className="border-t border-border bg-muted/30 px-4 py-4 mt-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
-          <span>© {new Date().getFullYear()} Combo Raport. Dane wyłącznie informacyjne.</span>
-          <div className="flex items-center gap-3">
-            <a
-              href="/"
-              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-            >
-              <Home className="size-3.5" />
-              <span>Strona główna</span>
-            </a>
-            <span>·</span>
-            <span>Wersja 0.0.1</span>
-            <span>·</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={scrollToTop}
-              className="h-7 gap-1.5 px-2"
-              aria-label="Wróć na górę"
-            >
-              <ArrowUp className="size-3.5" />
-              <span>Góra</span>
-            </Button>
-          </div>
-        </div>
-      </footer>
-    </div>
+      </div>
       </SidebarInset>
     </SidebarProvider>
   );
