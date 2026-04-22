@@ -1869,19 +1869,18 @@ function AppInner({
             <span className="font-semibold text-lg">Combo Raport</span>
           </div>
           <div className="flex items-center gap-2">
-            {showAdminNav && onGoAdmin && (
+            {authUser?.role === "admin" && onGoAdmin && (
               <div className="flex items-center rounded-lg border border-border bg-muted p-0.5 text-xs font-medium">
                 <button
-                  onClick={() => {/* already in tables view */}}
                   className="rounded-md px-3 py-1.5 bg-background text-foreground shadow-sm transition-colors"
                 >
-                  USER
+                  NORMAL
                 </button>
                 <button
                   onClick={onGoAdmin}
                   className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  ADMIN
+                  AUDYT
                 </button>
               </div>
             )}
@@ -2088,12 +2087,12 @@ function AdminView({ onGoTables }: { onGoTables: () => void }) {
                 onClick={onGoTables}
                 className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
               >
-                USER
+                NORMAL
               </button>
               <button
                 className="rounded-md px-3 py-1.5 bg-background text-foreground shadow-sm transition-colors"
               >
-                ADMIN
+                AUDYT
               </button>
             </div>
             <Button variant="ghost" size="sm" onClick={() => logout()}>
