@@ -28,7 +28,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarTrigger,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
@@ -1749,11 +1748,13 @@ function mergeYtdRows(rowsArrays: YtdRow[][]): YtdRow[] {
 function AppSidebar({
   showAdminNav,
   onGoAdmin,
+  onGoTables,
   authUser,
   logout,
 }: {
   showAdminNav: boolean;
   onGoAdmin?: () => void;
+  onGoTables?: () => void;
   authUser?: { name?: string; email?: string } | null;
   logout: () => void;
 }) {
@@ -1771,8 +1772,8 @@ function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<a href="/" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <img src="/vite.svg" alt="Logo" className="size-5 invert" />
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-white">
+                <img src="/vite.svg" alt="Logo" className="size-6" />
               </div>
               <div className="flex flex-col leading-tight">
                 <span className="font-semibold text-sm">Combo Raport</span>
@@ -1805,12 +1806,22 @@ function AppSidebar({
             <SidebarGroupLabel>Administracja</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Panel admina" onClick={() => onGoAdmin?.()}>
-                    <ShieldCheck />
-                    <span>Panel admina</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {onGoAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Panel admina" onClick={onGoAdmin}>
+                      <ShieldCheck />
+                      <span>Panel admina</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {onGoTables && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Widok tabel" onClick={onGoTables}>
+                      <BarChart3 />
+                      <span>Widok tabel</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -2055,10 +2066,6 @@ function AppInner({
       />
       <SidebarInset>
       <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-card sticky top-0 z-20">
-          <SidebarTrigger />
-          <span className="font-semibold text-base">Combo Raport</span>
-        </div>
       <main className="flex-1">
         <div className="w-full px-[5%] py-10 flex flex-col gap-8">
         <section id="t1" data-table-id={TABLE_IDS.T1} className="rounded-2xl border border-border bg-card px-6 py-6 shadow-sm">
@@ -2178,26 +2185,20 @@ function AppInner({
 function AdminView({ onGoTables }: { onGoTables: () => void }) {
   const { logout, user } = useAuth();
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/vite.svg" alt="Logo" className="size-8" />
-            <span className="font-semibold text-lg">Combo Raport — Admin</span>
-            <span className="text-xs text-muted-foreground ml-2">{user?.email}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onGoTables}>
-              Widok tabel
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => logout()}>
-              <LogOut className="size-4 mr-2" /> Wyloguj
-            </Button>
-          </div>
+    <SidebarProvider defaultOpen={true}>
+      <AppSidebar
+        showAdminNav={true}
+        onGoAdmin={undefined}
+        onGoTables={onGoTables}
+        authUser={user}
+        logout={logout}
+      />
+      <SidebarInset>
+        <div className="min-h-screen bg-background">
+          <AdminPanel />
         </div>
-      </header>
-      <AdminPanel />
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
