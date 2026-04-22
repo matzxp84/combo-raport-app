@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import nodemailer from "nodemailer";
 import { render as renderEmailMd } from "emailmd";
 
-import { LOCATIONS } from "../config/locations.ts";
+import { getLocations } from "./locations-store.ts";
 import {
   fetchOrders,
   extractOrdersSales,
@@ -199,7 +199,7 @@ export async function gatherReport(
   dateTo: string,
 ): Promise<LocationResult[]> {
   const results: LocationResult[] = [];
-  for (const loc of LOCATIONS) {
+  for (const loc of getLocations().filter((l) => l.status !== "closed")) {
     try {
       const data = await fetchOrders(loc.organization_id, dateFrom, dateTo);
       results.push({

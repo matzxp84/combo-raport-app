@@ -49,6 +49,10 @@ export default defineConfig(({ mode }) => {
       brotliSize: true,
     }),
   ],
+  server: {
+    allowedHosts: true,
+    host: true,
+  },
   resolve: {
     alias: {
       "@": "/src",

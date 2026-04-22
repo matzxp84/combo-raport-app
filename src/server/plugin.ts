@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
-import { LOCATIONS } from "../config/locations.ts";
+import { getLocations } from "./locations-store.ts";
+import { handleLocationsRoute } from "./locations-store.ts";
 import {
   extractCategoriesFromItems,
   extractOrdersSales,
@@ -24,6 +25,7 @@ import {
   requireAuth,
 } from "./auth.ts";
 import { handleEmailRoute } from "./email.ts";
+import { handleGoPosConfigRoute } from "./gopos-config.ts";
 
 const now = new Date();
 const TM_YEAR = now.getFullYear();
@@ -41,7 +43,7 @@ function getOrgId(req: IncomingMessage): string | null {
 }
 
 function knownOrg(orgId: string): boolean {
-  return LOCATIONS.some((l) => l.organization_id === orgId);
+  return getLocations().some((l) => l.organization_id === orgId);
 }
 
 async function handleT1Current(orgId: string, res: ServerResponse) {
@@ -123,6 +125,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
   if (pathname.startsWith("/api/admin/email/")) {
     return handleEmailRoute(pathname.slice("/api/admin/email".length), req, res);
+  }
+
+  if (pathname.startsWith("/api/admin/gopos")) {
+    return handleGoPosConfigRoute(pathname.slice("/api/admin/gopos".length), req, res);
+  }
+
+  if (pathname.startsWith("/api/admin/locations")) {
+    return handleLocationsRoute(pathname.slice("/api/admin".length), req, res);
   }
 
   if (pathname.startsWith("/api/admin/")) {

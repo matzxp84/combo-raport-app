@@ -29,6 +29,7 @@ services:
     build:
       context: .
       target: prod
+    image: combo-raport-prod:latest
     container_name: combo_prod
     ports:
       - "4173:4173"

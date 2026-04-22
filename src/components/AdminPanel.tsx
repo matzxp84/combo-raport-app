@@ -13,6 +13,8 @@ import {
 import { useAuth } from "@/contexts/useAuth";
 import type { AuthUser } from "@/contexts/AuthContext";
 import { EmailReportSection } from "@/components/EmailReportSection";
+import { GoPosConfigSection } from "@/components/GoPosConfigSection";
+import { LocationsSection } from "@/components/LocationsSection";
 
 type AdminUser = AuthUser;
 
@@ -32,7 +34,7 @@ type EditState = {
   password: string;
 };
 
-type Section = "users" | "email" | "logs-login" | "logs-api" | "logs-report";
+type Section = "users" | "email" | "gopos" | "locations" | "logs-login" | "logs-api" | "logs-report";
 
 export function AdminPanel() {
   const { user: me, authFetch } = useAuth();
@@ -165,6 +167,20 @@ export function AdminPanel() {
             Email raport
           </Button>
           <Button
+            variant={section === "gopos" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSection("gopos")}
+          >
+            GoPos API
+          </Button>
+          <Button
+            variant={section === "locations" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSection("locations")}
+          >
+            Lokalizacje
+          </Button>
+          <Button
             variant={section === "logs-login" ? "default" : "outline"}
             size="sm"
             onClick={() => setSection("logs-login")}
@@ -192,6 +208,8 @@ export function AdminPanel() {
       {loading && <p className="text-sm text-muted-foreground">Ładowanie…</p>}
 
       {section === "email" && <EmailReportSection />}
+      {section === "gopos" && <GoPosConfigSection />}
+      {section === "locations" && <LocationsSection />}
 
       {section === "users" && (
         <>

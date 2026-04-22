@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadGoPosConfig } from "./gopos-config.ts";
 
 export class GoPosAuthError extends Error {
   constructor(message: string) {
@@ -26,13 +27,14 @@ function ensureCacheDir(): void {
 }
 
 function getConfig() {
-  const clientId = process.env.GOPOS_CLIENT_ID;
-  const clientSecret = process.env.GOPOS_CLIENT_SECRET;
-  const baseUrl = process.env.GOPOS_BASE_URL ?? "https://app.gopos.io";
-  const bufferSeconds = Number(process.env.GOPOS_TOKEN_BUFFER_SECONDS ?? "300");
+  const fileCfg = loadGoPosConfig();
+  const clientId = fileCfg?.clientId || process.env.GOPOS_CLIENT_ID;
+  const clientSecret = fileCfg?.clientSecret || process.env.GOPOS_CLIENT_SECRET;
+  const baseUrl = fileCfg?.baseUrl || process.env.GOPOS_BASE_URL || "https://app.gopos.io";
+  const bufferSeconds = fileCfg?.tokenBufferSeconds ?? Number(process.env.GOPOS_TOKEN_BUFFER_SECONDS ?? "300");
   if (!clientId || !clientSecret) {
     throw new GoPosAuthError(
-      "GOPOS_CLIENT_ID / GOPOS_CLIENT_SECRET missing from env"
+      "GOPOS_CLIENT_ID / GOPOS_CLIENT_SECRET — brak konfiguracji (ustaw w Panelu admina → GoPos API lub w zmiennych środowiskowych)"
     );
   }
   return { clientId, clientSecret, baseUrl, bufferSeconds };
