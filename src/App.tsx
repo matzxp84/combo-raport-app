@@ -591,7 +591,7 @@ function KpiMonthlyTable({
                 type="checkbox"
                 checked={chartCols.has(col.label)}
                 onChange={() => onChartColToggle(col.label)}
-                className="size-3 cursor-pointer accent-primary self-center"
+                className="size-3 cursor-pointer opacity-40 hover:opacity-70 transition-opacity self-center"
                 title="Pokaż na wykresie"
               />
             )}
@@ -1003,7 +1003,7 @@ function ReportTable({
                 type="checkbox"
                 checked={chartCols.has(month.id)}
                 onChange={() => onChartColToggle(month.id)}
-                className="size-3 cursor-pointer accent-primary self-center"
+                className="size-3 cursor-pointer opacity-40 hover:opacity-70 transition-opacity self-center"
                 title="Pokaż na wykresie"
               />
             )}
