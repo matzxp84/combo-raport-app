@@ -1516,6 +1516,65 @@ type TableVisibility = {
   showPln: boolean;
 };
 
+function ChartSelector({
+  label,
+  items,
+  selected,
+  onChange,
+}: {
+  label: string;
+  items: { id: string; label: string }[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
+  const allSelected = items.every((i) => selected.has(i.id));
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) {
+      if (next.size === 1) return;
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    onChange(next);
+  };
+  const toggleAll = () => {
+    if (allSelected) {
+      onChange(new Set([items[0].id]));
+    } else {
+      onChange(new Set(items.map((i) => i.id)));
+    }
+  };
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
+        <button onClick={toggleAll} className="text-xs text-primary hover:underline">
+          {allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => {
+          const active = selected.has(item.id);
+          return (
+            <button
+              key={item.id}
+              onClick={() => toggle(item.id)}
+              className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                active
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function TableVisibilityToggles({
   visibility,
   onVisibilityChange,
@@ -1700,6 +1759,18 @@ function AppInner({
     showPln: true,
   });
 
+  // Chart row/col selectors
+  const T1_ROW_IDS = ["2026", "2025", "2024", "2023"];
+  const T1_COL_IDS = MONTHS.map((m) => m.id);
+  const T2_COL_IDS = KPI_MONTH_COLUMNS.map((c) => c.label);
+  const T5_ROW_IDS = ["total", "pizza", "other-sales-qty", "drinks"];
+
+  const [t1ChartRows, setT1ChartRows] = useState<Set<string>>(new Set(T1_ROW_IDS));
+  const [t1ChartCols, setT1ChartCols] = useState<Set<string>>(new Set(T1_COL_IDS));
+  const [t2ChartRows, setT2ChartRows] = useState<Set<string>>(new Set(T2_ROW_ORDER));
+  const [t2ChartCols, setT2ChartCols] = useState<Set<string>>(new Set(T2_COL_IDS));
+  const [t5ChartRows, setT5ChartRows] = useState<Set<string>>(new Set(T5_ROW_IDS));
+
   const t1OrgId = t1Locations[0]?.organizationId;
   const t2OrgId = t2Locations[0]?.organizationId;
   const t5OrgId = t5Locations[0]?.organizationId;
@@ -1815,6 +1886,28 @@ function AppInner({
   const t5Display = dataError.t5
     ? ytdSalesData.map((r) => ({ ...r, ytd: "-" }))
     : t5Data;
+
+  // Chart-filtered data
+  const t1ChartData = t1Display
+    .filter((r) => t1ChartRows.has(r.id))
+    .map((r) => ({
+      ...r,
+      cells: r.cells.filter((_, i) => t1ChartCols.has(MONTHS[i]?.id ?? "")),
+    }));
+  const t1ChartMonthLabels = MONTHS.filter((m) => t1ChartCols.has(m.id)).map((m) => m.label);
+
+  const t2ChartData = t2Display
+    .filter((r) => t2ChartRows.has(r.id))
+    .map((r) => ({
+      ...r,
+      label: KPI_LABELS_T2_T3[r.id] ?? r.label,
+      cells: r.cells.filter((_, i) => t2ChartCols.has(KPI_MONTH_COLUMNS[i]?.label ?? "")),
+    }));
+  const t2ChartMonthLabels = KPI_MONTH_COLUMNS
+    .filter((c) => t2ChartCols.has(c.label))
+    .map((c) => formatKpiMonthDisplay(c.from));
+
+  const t5ChartData = t5Display.filter((r) => t5ChartRows.has(r.id));
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -1940,8 +2033,22 @@ function AppInner({
               hasPln={false}
             />
           </div>
+          <div className="mb-3 rounded-lg border border-border bg-muted/30 p-3 flex flex-col gap-3">
+            <ChartSelector
+              label="Wiersze (lata)"
+              items={T1_ROW_IDS.map((id) => ({ id, label: id }))}
+              selected={t1ChartRows}
+              onChange={setT1ChartRows}
+            />
+            <ChartSelector
+              label="Kolumny (miesiące)"
+              items={MONTHS.map((m) => ({ id: m.id, label: m.label.slice(0, 3) }))}
+              selected={t1ChartCols}
+              onChange={setT1ChartCols}
+            />
+          </div>
           <div className="mb-4 rounded-lg border border-border bg-card p-3">
-            <T1VolumeChart data={t1Display} />
+            <T1VolumeChart data={t1ChartData} monthLabels={t1ChartMonthLabels} />
           </div>
           <ReportTable
             data={t1Display}
@@ -1969,14 +2076,22 @@ function AppInner({
               onVisibilityChange={setT2Visibility}
             />
           </div>
-          <div className="mb-4 rounded-lg border border-border bg-card p-3">
-            <T2KpiChart
-              data={t2Display.filter((r) => T2_ALLOWED_ROW_IDS.has(r.id)).map((r) => ({
-                ...r,
-                label: KPI_LABELS_T2_T3[r.id] ?? r.label,
-              }))}
-              monthLabels={KPI_MONTH_COLUMNS.map((c) => formatKpiMonthDisplay(c.from))}
+          <div className="mb-3 rounded-lg border border-border bg-muted/30 p-3 flex flex-col gap-3">
+            <ChartSelector
+              label="Wiersze (wskaźniki)"
+              items={T2_ROW_ORDER.map((id) => ({ id, label: KPI_LABELS_T2_T3[id] ?? id }))}
+              selected={t2ChartRows}
+              onChange={setT2ChartRows}
             />
+            <ChartSelector
+              label="Kolumny (miesiące)"
+              items={KPI_MONTH_COLUMNS.map((c) => ({ id: c.label, label: c.label }))}
+              selected={t2ChartCols}
+              onChange={setT2ChartCols}
+            />
+          </div>
+          <div className="mb-4 rounded-lg border border-border bg-card p-3">
+            <T2KpiChart data={t2ChartData} monthLabels={t2ChartMonthLabels} />
           </div>
           <KpiMonthlyTable
             showIds={t2Visibility.showId}
@@ -2014,8 +2129,16 @@ function AppInner({
               hasPercent={false}
             />
             </div>
+            <div className="mb-3 rounded-lg border border-border bg-muted/30 p-3">
+              <ChartSelector
+                label="Kategorie"
+                items={T5_ROW_IDS.map((id) => ({ id, label: ytdSalesData.find((r) => r.id === id)?.category ?? id }))}
+                selected={t5ChartRows}
+                onChange={setT5ChartRows}
+              />
+            </div>
             <div className="mb-4 rounded-lg border border-border bg-card p-3">
-              <T5YtdChart data={t5Display} />
+              <T5YtdChart data={t5ChartData} />
             </div>
             <YtdSalesTable
               data={t5Display}

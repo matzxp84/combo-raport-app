@@ -17,23 +17,37 @@ type ReportRow = {
   cells: { value: string }[];
 };
 
-const MONTH_LABELS = [
+const DEFAULT_MONTH_LABELS = [
   "Sty", "Lut", "Mar", "Kwi", "Maj", "Cze",
   "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru",
 ];
 
-export function T1VolumeChart({ data }: { data: ReportRow[] }) {
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
+
+export function T1VolumeChart({
+  data,
+  monthLabels,
+}: {
+  data: ReportRow[];
+  monthLabels?: string[];
+}) {
+  const labels = monthLabels ?? DEFAULT_MONTH_LABELS;
+
   const chartData = useMemo(() => {
-    const ty = data.find((r) => r.id === "2026");
-    const ly = data.find((r) => r.id === "2025");
-    const ay = data.find((r) => r.id === "2024");
-    return MONTH_LABELS.map((label, i) => ({
-      month: label,
-      TY: parseCellValue(ty?.cells[i]?.value) ?? 0,
-      LY: parseCellValue(ly?.cells[i]?.value) ?? 0,
-      AY: parseCellValue(ay?.cells[i]?.value) ?? 0,
-    }));
-  }, [data]);
+    return labels.map((label, i) => {
+      const point: Record<string, string | number> = { month: label };
+      for (const row of data) {
+        point[row.label] = parseCellValue(row.cells[i]?.value) ?? 0;
+      }
+      return point;
+    });
+  }, [data, labels]);
 
   return (
     <div className="w-full h-[220px]">
@@ -51,9 +65,13 @@ export function T1VolumeChart({ data }: { data: ReportRow[] }) {
             }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="TY" fill="var(--chart-1, #10b981)" name="2026 (TY)" />
-          <Bar dataKey="LY" fill="var(--chart-2, #3b82f6)" name="2025 (LY)" />
-          <Bar dataKey="AY" fill="var(--chart-3, #f59e0b)" name="2024 (AY)" />
+          {data.map((row, idx) => (
+            <Bar
+              key={row.id}
+              dataKey={row.label}
+              fill={CHART_COLORS[idx % CHART_COLORS.length]}
+            />
+          ))}
         </BarChart>
       </ResponsiveContainer>
     </div>
